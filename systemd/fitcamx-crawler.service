@@ -1,0 +1,20 @@
+[Unit]
+Description=Video Crawler and GCS Uploader for Pi Zero W
+# Make sure the network stack is up before launching
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/video_app
+# Points to your Google Cloud Service Account JSON key file
+Environment=GOOGLE_APPLICATION_CREDENTIALS=/home/pi/video_app/gcs-key.json
+# Executes the script using your Python virtual environment
+ExecStart=/home/pi/video_app/venv/bin/python main.py
+
+# Always try to reboot the script after 15 seconds if a brownout or crash occurs
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target
