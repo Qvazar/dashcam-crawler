@@ -23,7 +23,7 @@ fi
 # Verify all dependencies are installed
 missing_deps=()
 for dep in "${DEPS[@]}"; do
-  if ! dpkg -l | grep -q "^ii.*$dep"; then
+  if ! dpkg -l "$dep" 2>/dev/null | grep -q '^ii'; then
     missing_deps+=("$dep")
   fi
 done
