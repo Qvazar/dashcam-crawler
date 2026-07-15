@@ -1,5 +1,5 @@
 [Unit]
-Description=FitcamX Crawler and GCS Uploader for Pi Zero W
+Description=FitcamX Dashcam Crawler
 # Make sure the network stack is up before launching
 After=network.target
 StartLimitBurst=10
@@ -9,12 +9,11 @@ StartLimitAction=reboot
 [Service]
 Environment='CAMERA_SSID=CAR-DJ94228'
 Environment='VIDEO_RECORDING_WINDOW=2'
-Environment='VIDEO_EXTENDED_LOCK_WINDOW=5'
-Environment='UPLOAD_TARGET=gcs://<bucket-name>'
-Environment='GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json'
+Environment='VIDEO_EXTENDED_LOCK_WINDOW=3'
+Environment='UPLOAD_TARGET=gs://your-bucket'
 Type=exec
 User=fitcamx-crawler
-WorkingDirectory=/opt/fitcamx-crawler
+WorkingDirectory=/var/fitcamx-crawler/
 ExecStart=/opt/fitcamx-crawler/.venv/bin/python3 main.py
 Restart=always
 RestartSec=15

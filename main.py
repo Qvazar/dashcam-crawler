@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 import email.utils
 import logging
 import os
@@ -11,31 +11,35 @@ import requests
 from bs4 import BeautifulSoup
 from google.cloud import storage
 
+
 # --- ENUMS ---
 class VideoStatus(Enum):
     FOUND = "found"
     DOWNLOADED = "downloaded"
-    UPLOADED = "uploaded"
     IGNORED = "ignored"
-    DELETED = "deleted"
+    UPLOADED = "uploaded"
+
 
 # --- CONFIGURATION ---
 CAMERA_SSID = os.environ.get("CAMERA_SSID", None)  # Name of your specific camera WiFi
 CAMERA_VIDEO_DIRS = os.environ.get("CAMERA_VIDEO_DIRS", "CARDV/Movie/,CARDV/Movie_E/").split(",")  # Comma-separated list of video directories on the camera
-CAMERA_VIDEO_LOCKED_DIRS = os.environ.get("CAMERA_VIDEO_LOCKED_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for locked videos (if applicable)
-# Additional minutes to extend the locked video window - will download non-locked videos around locked videos
-VIDEO_EXTENDED_LOCK_WINDOW = int(os.environ.get("VIDEO_EXTENDED_LOCK_WINDOW", 0))
+CAMERA_VIDEO_MARKED_DIRS = os.environ.get("CAMERA_VIDEO_MARKED_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
+# Additional minutes to extend the marked video window - will download non-marked videos around marked videos
+VIDEO_EXTENDED_MARKED_WINDOW = int(os.environ.get("VIDEO_EXTENDED_MARKED_WINDOW", 0))
 VIDEO_RECORDING_WINDOW = int(os.environ.get("VIDEO_RECORDING_WINDOW", 2))  # Minutes to wait before downloading a video that is still being recorded
-DOWNLOAD_DIR = os.environ.get("VIDEO_DOWNLOAD_DIR", "/var/fitcamx-crawler/videos")  # Local directory to store downloaded videos
-UPLOAD_TARGET= os.environ.get("UPLOAD_TARGET", "gcs")  # Target for uploads (currently only supports 'gcs')
-DB_FILE = "/var/fitcamx-crawler/fitcamx-crawler.db"
+VIDEO_DOWNLOAD_DIR = os.environ.get("VIDEO_DOWNLOAD_DIR", "./videos")  # Local directory to store downloaded videos
+UPLOAD_TARGET = os.environ.get("UPLOAD_TARGET", "")  # Target for uploads (currently only supports 'gs' and 'ssh' paths)
+
+DB_FILENAME = "fitcamx-crawler.db"
 CHUNK_SIZE = 5 * 1024 * 1024  # 5 MB chunks for download/upload (RAM efficient)
+VIDEO_TEMP_FILENAME = ".~downloading_video.TS"  # Temporary filename for downloading videos before renaming
+
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
 # Ensure the download directory exists
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(VIDEO_DOWNLOAD_DIR, exist_ok=True)
 
 # Validate required environment variables
 if not CAMERA_SSID:
@@ -53,7 +57,7 @@ def get_current_ssid():
         return result.stdout.strip()
     except Exception as e:
         logger.exception("Unable to retrieve current SSID: %s", e)
-        return None
+        return ""
 
 
 def get_network_gateway():
@@ -75,7 +79,7 @@ def get_network_gateway():
 
 def init_database():
     """Connects to SQLite using strict power-failure protection settings."""
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILENAME)
     # WAL mode and FULL synchronization protect against corruption during power cuts
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous = FULL;")
@@ -86,7 +90,7 @@ def init_database():
             camera_path TEXT NOT NULL,
             status TEXT NOT NULL, -- uses values from VideoStatus enum
             recorded_at TIMESTAMP NOT NULL,
-            locked BOOLEAN DEFAULT 0,
+            marked BOOLEAN DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -102,7 +106,6 @@ def get_recorded_at_from_filename(filename):
 
 def crawl_and_download(conn):
     """Connected to the camera WiFi. Find videos and stream them to disk."""
-    logger.info("Connected to camera WiFi. Starting crawler...")
 
     camera_ip = get_network_gateway()
     if not camera_ip:
@@ -111,41 +114,8 @@ def crawl_and_download(conn):
 
     camera_url = f"http://{camera_ip}"
 
-
-    cursor = conn.cursor()
-
-    # Delete all videos from camera to free up space (only if they are marked as uploaded or ignored in the database)
-    cursor.execute("SELECT filename, camera_path FROM videos WHERE status IN (?, ?)", (VideoStatus.UPLOADED.value, VideoStatus.IGNORED.value))
-    for filename, camera_path in cursor.fetchall():
-        video_deleted = False
-        try:
-            response = requests.get(f"{camera_url}/{camera_path}?del=1", timeout=10)
-            if response.status_code == 404:
-                logger.warning(f"Video {camera_path} not found on camera. It may have already been deleted.")
-            else:
-                response.raise_for_status()
-                logger.info(f"Successfully deleted {camera_path} from camera.")
-            video_deleted = True
-        except Exception:
-            # If GET with del=1 failed, try an explicit HTTP DELETE
-            try:
-                response = requests.delete(f"{camera_url}/{camera_path}", timeout=10)
-                if response.status_code == 404:
-                    logger.warning(f"Video {camera_path} not found on camera. It may have already been deleted.")
-                else:
-                    response.raise_for_status()
-                    logger.info(f"Successfully deleted {camera_path} from camera using HTTP DELETE.")
-                video_deleted = True
-            except Exception as e:
-                logger.exception("Error during deletion of '%s': %s", camera_path, e)
-
-        if video_deleted:
-            cursor.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.DELETED.value, filename))
-            conn.commit()
-
-
-    # First download list of all video directories (both normal and locked) to ensure we capture all relevant files
-    all_video_dirs = CAMERA_VIDEO_DIRS + CAMERA_VIDEO_LOCKED_DIRS
+    # First download list of all video directories (both normal and marked) to ensure we capture all relevant files
+    all_video_dirs = CAMERA_VIDEO_DIRS + CAMERA_VIDEO_MARKED_DIRS
     for video_dir in all_video_dirs:
         logger.info(f"Crawling video directory: {camera_url}/{video_dir}")
         try:
@@ -162,66 +132,70 @@ def crawl_and_download(conn):
                     # Resolve relative URLs to absolute paths
                     video_url = href if href.startswith('http') else f"{camera_url}{href}"
                     filename = os.path.basename(video_url)
+                    video_path = f"{video_dir}/{filename}"
                     video_recorded_at: datetime = get_recorded_at_from_filename(filename)
-                    video_locked: bool = video_dir in CAMERA_VIDEO_LOCKED_DIRS
+                    video_marked: bool = video_dir in CAMERA_VIDEO_MARKED_DIRS
 
                     # Skip videos that are still being recorded (within the specified window)
-                    if camera_time - video_recorded_at < datetime.timedelta(minutes=VIDEO_RECORDING_WINDOW):
-                        logger.info(f"Skipping {filename} as it is still being recorded.")
+                    if camera_time - video_recorded_at < timedelta(minutes=VIDEO_RECORDING_WINDOW):
+                        logger.info(f"Skipping {video_path} as it might still be recorded to.")
                         continue
 
-                    cursor.execute("INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, locked) VALUES (?, ?, ?, ?)", 
-                                    (filename, f"{video_dir}/{filename}", VideoStatus.FOUND.value, video_recorded_at, video_locked))
-                    logger.info(f"Registered video: {filename} (Locked: {video_locked})")
+                    conn.execute("INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked) VALUES (?, ?, ?, ?)", 
+                                    (filename, video_path, VideoStatus.FOUND.value, video_recorded_at, video_marked))
+                    logger.info(f"Registered video: {video_path} (Marked: {video_marked})")
         except Exception as e:
             logger.exception("Error during crawling '%s': %s", camera_url, e)
-
     conn.commit()
 
-    # Find all videos that are not marked as locked and with a recorded_at outside of the locked window of locked videos' recorded_at and ignore them
-    cursor.execute(
-        """
-        UPDATE videos
-        SET status = ?
-        WHERE locked = 0
-            AND status = ?
-            AND NOT EXISTS (
-                SELECT 1 FROM videos AS locked_v
-                WHERE locked_v.locked = 1
-                AND locked_v.status = ?
-                AND videos.recorded_at BETWEEN datetime(locked_v.recorded_at, ?) AND datetime(locked_v.recorded_at, ?)
-            )
-        """,
-        (
-            VideoStatus.IGNORED.value,
-            VideoStatus.FOUND.value,
-            VideoStatus.FOUND.value,
-            f"-{VIDEO_EXTENDED_LOCK_WINDOW} minutes",
-            f"+{VIDEO_EXTENDED_LOCK_WINDOW} minutes",
-        ),
-    )
-    conn.commit()
-    logger.info("Ignored %s videos that are outside the locked window of locked videos.", cursor.rowcount)
+    # Find all videos that are not marked as marked and with a recorded_at outside of the marked window of marked videos' recorded_at and ignore them
+    with conn:
+        cursor = conn.execute(
+            """
+            UPDATE videos
+            SET status = ?
+            WHERE marked = 0
+                AND status = ?
+                AND NOT EXISTS (
+                    SELECT 1 FROM videos AS marked_v
+                    WHERE marked_v.marked = 1
+                    AND marked_v.status = ?
+                    AND videos.recorded_at BETWEEN datetime(marked_v.recorded_at, ?) AND datetime(marked_v.recorded_at, ?)
+                )
+            """,
+            (
+                VideoStatus.IGNORED.value,
+                VideoStatus.FOUND.value,
+                VideoStatus.FOUND.value,
+                f"-{VIDEO_EXTENDED_MARKED_WINDOW} minutes",
+                f"+{VIDEO_EXTENDED_MARKED_WINDOW} minutes",
+            ),
+        )
+        ignored_video_count = cursor.rowcount
+        logger.info("Ignored %s videos that are outside the marked window of marked videos.", ignored_video_count)
 
     # Download found videos that are not ignored
-    cursor.execute("SELECT filename, camera_path FROM videos WHERE status = ?", (VideoStatus.FOUND.value,))
-    for filename, camera_path in cursor.fetchall():
+    cursor = conn.execute("SELECT filename, camera_path, marked FROM videos WHERE status = ?", (VideoStatus.FOUND.value,))
+    for filename, camera_path, marked in cursor.fetchall():
         try:
-            local_path = os.path.join(DOWNLOAD_DIR, filename)
-            logger.info(f"Downloading {filename} in chunks...")
+            local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
+            local_path = os.path.splitext(local_path)[0] + "_M" + os.path.splitext(local_path)[1] if marked else local_path
+            video_url = f"{camera_url}/{camera_path}"
+            logger.info(f"Downloading {video_url}...")
             
-            with requests.get(f"{camera_url}/{camera_path}", stream=True, timeout=15) as video_stream:
+            with requests.get(f"{video_url}", stream=True, timeout=15) as video_stream:
                 video_stream.raise_for_status()
-                with open(local_path, 'wb') as f:
+                with open(VIDEO_TEMP_FILENAME, 'wb') as f:
                     for chunk in video_stream.iter_content(chunk_size=CHUNK_SIZE):
                         if chunk:
                             f.write(chunk)
                     f.flush()
+            os.replace(VIDEO_TEMP_FILENAME, local_path)  # Rename temp file to final filename after successful download
             
-            cursor.execute("UPDATE videos SET status = ? WHERE filename = ?", 
+            conn.execute("UPDATE videos SET status = ? WHERE filename = ?", 
                             (VideoStatus.DOWNLOADED.value, filename))
             conn.commit()
-            logger.info(f"Successfully downloaded {filename}.")            
+            logger.info(f"Successfully downloaded {video_url}.")
         except Exception as e:
             logger.exception("Error during downloading from '%s': %s", video_url, e)
 
@@ -256,10 +230,7 @@ class SshUploadTarget:
 
 def upload_to_target(conn, upload_target):
     """Phase 2: Connected to internet WiFi. Upload fully downloaded videos to the specified target."""
-    logger.info("Connected to internet WiFi. Starting uploads...")
-    cursor = conn.cursor()
-    
-    cursor.execute("SELECT filename FROM videos WHERE status = ?", (VideoStatus.DOWNLOADED.value,))
+    cursor = conn.execute("SELECT filename FROM videos WHERE status = ?", (VideoStatus.DOWNLOADED.value,))
     videos_to_upload = cursor.fetchall()
     
     if not videos_to_upload:
@@ -269,11 +240,11 @@ def upload_to_target(conn, upload_target):
     try:        
         for row in videos_to_upload:
             filename = row[0]
-            local_path = os.path.join(DOWNLOAD_DIR, filename)
+            local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
             
             if not os.path.exists(local_path):
                 logger.warning(f"File {filename} is missing from local storage. Resetting status to 'found'.")
-                cursor.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.FOUND.value, filename))
+                conn.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.FOUND.value, filename))
                 conn.commit()
                 continue
                 
@@ -281,22 +252,20 @@ def upload_to_target(conn, upload_target):
             upload_target.upload_file(local_path, filename)
             
             # Update database status and immediately delete the local file to free space
-            cursor.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.UPLOADED.value, filename))
-            conn.commit()
             os.remove(local_path)
+            conn.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.UPLOADED.value, filename))
+            conn.commit()
             logger.info(f"Successfully uploaded {filename} and removed it from local storage.")
             
     except Exception as e:
         logger.exception("Error during upload: %s", e)
 
 
-
 def main():
-    conn = init_database()
 
     upload_target = None
-    if UPLOAD_TARGET.startswith("gcs://"):
-        GCS_BUCKET_NAME = UPLOAD_TARGET[6:]  # Extract bucket name from the URL
+    if UPLOAD_TARGET.startswith("gs://"):
+        GCS_BUCKET_NAME = UPLOAD_TARGET[5:]  # Extract bucket name from the URL
         upload_target = GcsUploadTarget(GCS_BUCKET_NAME)
     elif UPLOAD_TARGET.startswith("ssh://"):
         # Example: ssh://user@host:/path/to/upload
@@ -314,15 +283,25 @@ def main():
         logger.info(f"Current WiFi SSID: '{ssid}'")
         
         if ssid == CAMERA_SSID:
-            crawl_and_download(conn)
+            logger.info("Connected to camera WiFi. Starting crawler...")
+
+            conn = init_database()
+            try:
+                crawl_and_download(conn)
+            finally:
+                conn.close()
         elif ssid == "":
-            logger.info("Not connected to any WiFi network. Waiting...")
+            logger.info("No WiFi connection. Waiting...")
         else:
-            # Connected to any other WiFi network (e.g., home network or internet hotspot)
-            upload_to_target(conn, upload_target)
+            logger.info("Connected to WiFi %s. Starting upload...", ssid)
+            conn = init_database()
+            try:
+                upload_to_target(conn, upload_target)
+            finally:
+                conn.close()
             
         # Idle sleep interval to avoid unnecessary CPU/battery consumption
-        time.sleep(60)
+        time.sleep(600)  # Sleep for 10 minutes before checking again
 
 if __name__ == "__main__":
     main()
