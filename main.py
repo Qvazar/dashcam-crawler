@@ -56,8 +56,8 @@ def get_current_ssid():
         )
         return result.stdout.strip()
     except Exception as e:
-        logger.exception("Unable to retrieve current SSID: %s", e)
-        return ""
+        logger.debug("Unable to retrieve current SSID: %s", e)
+        return None
 
 
 def get_network_gateway():
@@ -179,7 +179,7 @@ def crawl_and_download(conn):
     for filename, camera_path, marked in cursor.fetchall():
         try:
             local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
-            local_path = os.path.splitext(local_path)[0] + "_M" + os.path.splitext(local_path)[1] if marked else local_path
+            #local_path = os.path.splitext(local_path)[0] + "_M" + os.path.splitext(local_path)[1] if marked else local_path
             video_url = f"{camera_url}/{camera_path}"
             logger.info(f"Downloading {video_url}...")
             
@@ -208,9 +208,10 @@ class GcsUploadTarget:
         self.storage_client = storage.Client()
         self.bucket = self.storage_client.bucket(bucket_name)
     
-    def upload_file(self, local_path, filename):
+    def upload_file(self, local_path, filename, marked: bool):
         """Uploads a file to GCS in chunks."""
         blob = self.bucket.blob(filename, chunk_size=CHUNK_SIZE)
+        blob.metadata = {"marked": str(marked)}
         blob.upload_from_filename(local_path)
 
 
@@ -222,7 +223,7 @@ class SshUploadTarget:
         self.remote_host = remote_host
         self.remote_path = remote_path
     
-    def upload_file(self, local_path, filename):
+    def upload_file(self, local_path, filename, marked: bool):
         """Uploads a file to the remote server using SCP."""
         remote_full_path = f"{self.remote_user}@{self.remote_host}:{os.path.join(self.remote_path, filename)}"
         subprocess.run(["scp", local_path, remote_full_path], check=True)
@@ -230,16 +231,17 @@ class SshUploadTarget:
 
 def upload_to_target(conn, upload_target):
     """Phase 2: Connected to internet WiFi. Upload fully downloaded videos to the specified target."""
-    cursor = conn.execute("SELECT filename FROM videos WHERE status = ?", (VideoStatus.DOWNLOADED.value,))
+    cursor = conn.execute("SELECT filename, marked FROM videos WHERE status = ?", (VideoStatus.DOWNLOADED.value,))
     videos_to_upload = cursor.fetchall()
     
     if not videos_to_upload:
         logger.info("No videos are currently staged for upload.")
         return
 
+    logger.info(f"Preparing to upload {len(videos_to_upload)} videos to target: {UPLOAD_TARGET}")
+
     try:        
-        for row in videos_to_upload:
-            filename = row[0]
+        for filename, marked in videos_to_upload:
             local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
             
             if not os.path.exists(local_path):
@@ -249,7 +251,7 @@ def upload_to_target(conn, upload_target):
                 continue
                 
             logger.info(f"Uploading {filename}...")
-            upload_target.upload_file(local_path, filename)
+            upload_target.upload_file(local_path, filename, marked)
             
             # Update database status and immediately delete the local file to free space
             os.remove(local_path)
@@ -288,10 +290,9 @@ def main():
                 crawl_and_download(conn)
             finally:
                 conn.close()
-        elif ssid == "":
+        elif ssid == None:
             logger.info("No WiFi connection. Waiting...")
         else:
-            logger.info("Connected to WiFi %s. Starting upload...", ssid)
             conn = init_database()
             try:
                 upload_to_target(conn, upload_target)
@@ -299,7 +300,7 @@ def main():
                 conn.close()
             
         # Idle sleep interval to avoid unnecessary CPU/battery consumption
-        time.sleep(600)  # Sleep for 10 minutes before checking again
+        time.sleep(60)  # Sleep for 1 minute before checking again
 
 if __name__ == "__main__":
     main()
