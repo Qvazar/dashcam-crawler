@@ -283,8 +283,6 @@ def main():
         logger.info(f"Current WiFi SSID: '{ssid}'")
         
         if ssid == CAMERA_SSID:
-            logger.info("Connected to camera WiFi. Starting crawler...")
-
             conn = init_database()
             try:
                 crawl_and_download(conn)
