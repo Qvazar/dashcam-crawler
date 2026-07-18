@@ -34,34 +34,34 @@ if [ ${#missing_deps[@]} -gt 0 ]; then
   exit 1
 fi
 
-echo "Setting up user and directories..."
+echo "### Setting up user and directories..."
 useradd -d "$DATA_DIR" -m "$USER" 2>/dev/null || true
-mkdir -p "$DATA_DIR"
-chown "$USER:$USER" "$DATA_DIR"
+install -d -m 755 -o "$USER" -g "$USER" "$DATA_DIR"
 
-echo "Setting up configuration..."
+echo "### Setting up configuration..."
 if [ ! -f "/etc/fitcamx-crawler.conf" ]; then
   install -m 644 "$PROJECT_ROOT/fitcamx-crawler.conf" "/etc/fitcamx-crawler.conf"
 fi
 
-echo "Setting up virtual environment and installing Python dependencies..."
+echo "### Setting up virtual environment and installing Python dependencies..."
 if [ ! -d "$VENV_DIR" ]; then
   "$PYTHON" -m venv "$VENV_DIR"
 fi
 
-echo "Upgrading pip and installing requirements..."
+echo "### Upgrading pip and installing requirements..."
 "$VENV_DIR/bin/pip" install --upgrade pip
 if [ -f "$PROJECT_ROOT/requirements.txt" ]; then
   "$VENV_DIR/bin/pip" install -r "$PROJECT_ROOT/requirements.txt"
 fi
 
-echo "Setting up systemd service..."
+echo "### Setting up systemd service..."
 systemctl disable --now "$SERVICE_NAME" 2>/dev/null || true
 envsubst < "$PROJECT_ROOT/$SERVICE_NAME" > "$SERVICE_FILE"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl start "$SERVICE_NAME"
 
-echo "Installation complete. The service '$SERVICE_NAME' has been started and enabled."
-echo "Configuration file is located at /etc/fitcamx-crawler.conf. Please edit it as needed and restart the service."
+echo "### Installation complete."
+echo "The service '$SERVICE_NAME' has been started and enabled."
+echo "Configuration file is located at /etc/fitcamx-crawler.conf. Please edit it as needed and restart the service with: systemctl restart $SERVICE_NAME"
 echo "Logs can be viewed using: journalctl -u $SERVICE_NAME -f"
