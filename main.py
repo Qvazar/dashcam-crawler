@@ -205,6 +205,7 @@ def start_crawl_and_download(dbconn):
             logger.debug("Ignored %s videos that are outside the marked window of marked videos.", ignored_video_count)
 
     # Download found videos that are not ignored
+    # TODO Ignore the last VIDEO_RECORDING_WINDOW minutes of video
     cursor = dbconn.execute("SELECT filename, camera_path FROM videos WHERE status = ?", (VideoStatus.FOUND.value,))
     logger.info(f"Found {cursor.rowcount} videos to download from camera.")
     for filename, camera_path in cursor.fetchall():
