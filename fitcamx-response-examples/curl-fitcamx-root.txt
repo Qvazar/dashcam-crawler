@@ -1,0 +1,41 @@
+08:19:07.530941 [0-0] * [SETUP] added
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+  0      0   0      0   0      0      0      0                              008:19:07.542007 [0-0] *   Trying 192.168.1.254:80...
+08:19:07.543055 [0-0] * [SETUP] Curl_conn_connect(block=0) -> 0, done=0
+08:19:07.551082 [0-0] * [SETUP] Curl_conn_connect(block=0) -> 0, done=1
+08:19:07.552072 [0-0] * Established connection to 192.168.1.254 (192.168.1.254 port 80) from 192.168.1.34 port 39862 
+08:19:07.552826 [0-0] * [SETUP] query ALPN
+08:19:07.553600 [0-0] * using HTTP/1.x
+08:19:07.554505 [0-0] > GET / HTTP/1.1
+08:19:07.554505 [0-0] > Host: 192.168.1.254
+08:19:07.554505 [0-0] > User-Agent: curl/8.18.0
+08:19:07.554505 [0-0] > Accept: */*
+08:19:07.554505 [0-0] > 
+08:19:07.558084 [0-0] * Request completely sent off
+08:19:07.573834 [0-0] < HTTP/1.1 200 OK
+08:19:07.574730 [0-0] < Server: hfs/1.00.000
+08:19:07.575469 [0-0] < Cache-Control: no-store, no-cache, must-revalidate
+08:19:07.576430 [0-0] < Pragma: no-cache
+08:19:07.577405 [0-0] < Accept-Ranges: bytes
+08:19:07.578328 [0-0] < Content-Length: 703
+08:19:07.579317 [0-0] < Content-Type: text/html
+08:19:07.580987 [0-0] < Connection: close
+08:19:07.582074 [0-0] < 
+08:19:07.583312 [0-0] { [703 bytes data]
+100    703 100    703   0      0  12915      0                              0100    703 100    703   0      0  12188      0                              0100    703 100    703   0      0  11586      0                              0
+08:19:07.594792 [0-0] * shutting down connection #0
+<html>
+<body>
+<div id=folderlabel>folder</div>
+<div id=folder></div>
+<div id=body>
+<table cellpadding=5>
+<th>Filename
+<th>Filesize
+<th>Filetime
+<tr><td><a href="/CARDV"><b>CARDV</b></a><td align=center><i>folder</i><td align=right>2026/01/09 09:16:48
+<tr><td colspan="4"><hr size=1 noshade align=top></td></tr></table>
+<form name=frm action="" method=post enctype="multipart/form-data"><input name=fileupload1 size=70 type=file><br/><input name=upbtn type=submit value="Upload files"></form><form name=frm2 action="?custom=1" method=post enctype="multipart/form-data"><input name=fileupload2 size=70 type=file><br/><input name=upbtn type=submit value="Upload Custom files"></form></div>
+</body>
+</html>
