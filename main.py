@@ -2,12 +2,15 @@ from datetime import datetime, timedelta
 import email.utils
 import logging
 import os
+import re
+import paramiko
 import sys
 import time
 import sqlite3
 from enum import Enum
 import subprocess
 import requests
+from urllib.parse import urlsplit, urlunsplit
 from bs4 import BeautifulSoup
 from google.cloud import storage
 
@@ -22,13 +25,14 @@ class VideoStatus(Enum):
 
 # --- CONFIGURATION ---
 CAMERA_SSID = os.environ.get("CAMERA_SSID", None)  # Name of your specific camera WiFi
-CAMERA_VIDEO_DIRS = os.environ.get("CAMERA_VIDEO_DIRS", "CARDV/Movie/,CARDV/Movie_E/").split(",")  # Comma-separated list of video directories on the camera
-CAMERA_VIDEO_MARKED_DIRS = os.environ.get("CAMERA_VIDEO_MARKED_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
+CAMERA_MARKED_VIDEO_DIRS = os.environ.get("CAMERA_VIDEO_MARKED_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
 # Additional minutes to extend the marked video window - will download non-marked videos around marked videos
+VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS,.MP4").split(",")  # Comma-separated list of video file extensions to consider
 VIDEO_EXTENDED_MARKED_WINDOW = int(os.environ.get("VIDEO_EXTENDED_MARKED_WINDOW", 0))
 VIDEO_RECORDING_WINDOW = int(os.environ.get("VIDEO_RECORDING_WINDOW", 2))  # Minutes to wait before downloading a video that is still being recorded
 VIDEO_DOWNLOAD_DIR = os.environ.get("VIDEO_DOWNLOAD_DIR", "./videos")  # Local directory to store downloaded videos
 UPLOAD_TARGET = os.environ.get("UPLOAD_TARGET", "")  # Target for uploads (currently only supports 'gs' and 'ssh' paths)
+HEARTBEAT_INTERVAL = int(os.environ.get("HEARTBEAT_INTERVAL", 60))  # Interval in seconds for main heartbeat loop to check WiFi SSID and perform actions
 
 DB_FILENAME = "fitcamx-crawler.db"
 CHUNK_SIZE = 5 * 1024 * 1024  # 5 MB chunks for download/upload (RAM efficient)
@@ -45,6 +49,25 @@ os.makedirs(VIDEO_DOWNLOAD_DIR, exist_ok=True)
 if not CAMERA_SSID:
     logger.error("CAMERA_SSID environment variable is not set. Exiting.")
     sys.exit(1)
+
+if not UPLOAD_TARGET:
+    logger.warning("UPLOAD_TARGET is not set; uploads will be skipped until it is configured.")
+
+if not os.path.isdir(VIDEO_DOWNLOAD_DIR):
+    logger.error("VIDEO_DOWNLOAD_DIR is not a directory: %s", VIDEO_DOWNLOAD_DIR)
+    sys.exit(1)
+
+if not CAMERA_MARKED_VIDEO_DIRS:
+    logger.warning("CAMERA_VIDEO_MARKED_DIRS is empty; marked-video detection will be disabled.")
+
+logger.info(
+    "Startup configuration: ssid=%s, download_dir=%s, upload_target=%s, heartbeat=%ss, marked_dirs=%s",
+    CAMERA_SSID,
+    VIDEO_DOWNLOAD_DIR,
+    UPLOAD_TARGET or "<disabled>",
+    HEARTBEAT_INTERVAL,
+    CAMERA_MARKED_VIDEO_DIRS,
+)
 
 
 def get_current_ssid():
@@ -94,6 +117,9 @@ def init_database():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_marked ON videos(marked) WHERE marked = 1")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_recorded_at ON videos(recorded_at)")
     conn.commit()
     return conn
 
@@ -104,84 +130,87 @@ def get_recorded_at_from_filename(filename):
     return datetime.strptime(filename[:15], "%Y%m%d%H%M%S")
 
 
-def crawl_and_download(conn):
+def crawl_url(dbconn, url):
+    """Crawls a given URL and registers found video files in the database."""
+    logger.info(f"Crawling URL: {url}")
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        for link in soup.find_all('a'):
+            href = link.get('href')
+            if href:
+                if any(href.endswith(ext) for ext in VIDEO_EXTENSIONS):
+                    video_url = href if href.startswith('http') else f"{url}/{href}"
+                    video_path = urlsplit(video_url).path
+                    filename = os.path.basename(video_path)
+                    video_recorded_at: datetime = get_recorded_at_from_filename(filename)
+                    marked = any(dir in video_path for dir in CAMERA_MARKED_VIDEO_DIRS)
+
+                    dbconn.execute(
+                        "INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked) VALUES (?, ?, ?, ?, ?)", 
+                        (filename, video_path, VideoStatus.FOUND.value, video_recorded_at, marked)
+                    )
+                    logger.debug(f"Registered video: {video_path}")
+                elif not re.search(r'^\.\.?\/?$', href) and not re.search(r'.*\/$', href):  # Ignore '.' and '..' links and non-directory links
+                    # Recursively crawl subdirectories
+                    crawl_url(dbconn, f"{url}/{href}")
+    except Exception as e:
+        logger.exception("Error during url crawling '%s': %s", url, e)
+
+
+def start_crawl_and_download(dbconn):
     """Connected to the camera WiFi. Find videos and stream them to disk."""
 
     camera_ip = get_network_gateway()
-    if not camera_ip:
+    if camera_ip:
+        logger.info(f"Camera IP determined as: {camera_ip}")
+    else:
         logger.error("Could not determine camera address. Aborting crawl.")
         return
 
     camera_url = f"http://{camera_ip}"
 
-    # First download list of all video directories (both normal and marked) to ensure we capture all relevant files
-    all_video_dirs = CAMERA_VIDEO_DIRS + CAMERA_VIDEO_MARKED_DIRS
-    for video_dir in all_video_dirs:
-        logger.info(f"Crawling video directory: {camera_url}/{video_dir}")
-        try:
-            response = requests.get(f"{camera_url}/{video_dir}", timeout=10)
-            response.raise_for_status()
+    with dbconn:
+        crawl_url(dbconn, camera_url)  # Start crawling from the camera's root URL
 
-            camera_time = email.utils.parsedate_to_datetime(response.headers.get('Date'))
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Look for links ending in .TS (adjust selector based on the website structure)
-            for link in soup.find_all('a'):
-                href = link.get('href')
-                if href and href.endswith('.TS'):
-                    # Resolve relative URLs to absolute paths
-                    video_url = href if href.startswith('http') else f"{camera_url}{href}"
-                    filename = os.path.basename(video_url)
-                    video_path = f"{video_dir}/{filename}"
-                    video_recorded_at: datetime = get_recorded_at_from_filename(filename)
-                    video_marked: bool = video_dir in CAMERA_VIDEO_MARKED_DIRS
 
-                    # Skip videos that are still being recorded (within the specified window)
-                    if camera_time - video_recorded_at < timedelta(minutes=VIDEO_RECORDING_WINDOW):
-                        logger.info(f"Skipping {video_path} as it might still be recorded to.")
-                        continue
-
-                    conn.execute("INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked) VALUES (?, ?, ?, ?)", 
-                                    (filename, video_path, VideoStatus.FOUND.value, video_recorded_at, video_marked))
-                    logger.info(f"Registered video: {video_path} (Marked: {video_marked})")
-        except Exception as e:
-            logger.exception("Error during crawling '%s': %s", camera_url, e)
-    conn.commit()
-
-    # Find all videos that are not marked as marked and with a recorded_at outside of the marked window of marked videos' recorded_at and ignore them
-    with conn:
-        cursor = conn.execute(
-            """
-            UPDATE videos
-            SET status = ?
-            WHERE marked = 0
-                AND status = ?
-                AND NOT EXISTS (
-                    SELECT 1 FROM videos AS marked_v
-                    WHERE marked_v.marked = 1
-                    AND marked_v.status = ?
-                    AND videos.recorded_at BETWEEN datetime(marked_v.recorded_at, ?) AND datetime(marked_v.recorded_at, ?)
-                )
-            """,
-            (
-                VideoStatus.IGNORED.value,
-                VideoStatus.FOUND.value,
-                VideoStatus.FOUND.value,
-                f"-{VIDEO_EXTENDED_MARKED_WINDOW} minutes",
-                f"+{VIDEO_EXTENDED_MARKED_WINDOW} minutes",
-            ),
-        )
-        ignored_video_count = cursor.rowcount
-        logger.info("Ignored %s videos that are outside the marked window of marked videos.", ignored_video_count)
+    # Find all videos that are not marked and with a recorded_at outside of the marked window of marked videos' recorded_at and ignore them
+    if CAMERA_MARKED_VIDEO_DIRS:
+        with dbconn:
+            cursor = dbconn.execute(
+                """
+                UPDATE videos
+                SET status = ?
+                WHERE marked = 0
+                    AND status = ?
+                    AND NOT EXISTS (
+                        SELECT 1 FROM videos AS marked_v
+                        WHERE marked_v.marked = 1
+                        AND marked_v.status = ?
+                        AND videos.recorded_at BETWEEN datetime(marked_v.recorded_at, ?) AND datetime(marked_v.recorded_at, ?)
+                    )
+                """,
+                (
+                    VideoStatus.IGNORED.value,
+                    VideoStatus.FOUND.value,
+                    VideoStatus.FOUND.value,
+                    f"-{VIDEO_EXTENDED_MARKED_WINDOW} minutes",
+                    f"+{VIDEO_EXTENDED_MARKED_WINDOW} minutes",
+                ),
+            )
+            ignored_video_count = cursor.rowcount
+            logger.debug("Ignored %s videos that are outside the marked window of marked videos.", ignored_video_count)
 
     # Download found videos that are not ignored
-    cursor = conn.execute("SELECT filename, camera_path, marked FROM videos WHERE status = ?", (VideoStatus.FOUND.value,))
-    for filename, camera_path, marked in cursor.fetchall():
+    cursor = dbconn.execute("SELECT filename, camera_path FROM videos WHERE status = ?", (VideoStatus.FOUND.value,))
+    logger.info(f"Found {cursor.rowcount} videos to download from camera.")
+    for filename, camera_path in cursor.fetchall():
         try:
             local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
-            #local_path = os.path.splitext(local_path)[0] + "_M" + os.path.splitext(local_path)[1] if marked else local_path
             video_url = f"{camera_url}/{camera_path}"
-            logger.info(f"Downloading {video_url}...")
             
             with requests.get(f"{video_url}", stream=True, timeout=15) as video_stream:
                 video_stream.raise_for_status()
@@ -190,11 +219,11 @@ def crawl_and_download(conn):
                         if chunk:
                             f.write(chunk)
                     f.flush()
-            os.replace(VIDEO_TEMP_FILENAME, local_path)  # Rename temp file to final filename after successful download
+                os.replace(VIDEO_TEMP_FILENAME, local_path)  # Rename temp file to final filename after successful download
             
-            conn.execute("UPDATE videos SET status = ? WHERE filename = ?", 
+            dbconn.execute("UPDATE videos SET status = ? WHERE filename = ?", 
                             (VideoStatus.DOWNLOADED.value, filename))
-            conn.commit()
+            dbconn.commit()
             logger.info(f"Successfully downloaded {video_url}.")
         except Exception as e:
             logger.exception("Error during downloading from '%s': %s", video_url, e)
@@ -203,7 +232,8 @@ def crawl_and_download(conn):
 class GcsUploadTarget:
     """Handles uploads to Google Cloud Storage."""
     
-    def __init__(self, bucket_name):
+    def __init__(self, gs_url):
+        bucket_name = gs_url[5:]  # Extract bucket name from the URL
         self.bucket_name = bucket_name
         self.storage_client = storage.Client()
         self.bucket = self.storage_client.bucket(bucket_name)
@@ -214,93 +244,123 @@ class GcsUploadTarget:
         blob.metadata = {"marked": str(marked)}
         blob.upload_from_filename(local_path)
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        pass  # No explicit cleanup needed for GCS
+
 
 class SshUploadTarget:
     """Handles uploads to a remote server via SCP."""
     
-    def __init__(self, remote_user, remote_host, remote_path):
-        self.remote_user = remote_user
-        self.remote_host = remote_host
-        self.remote_path = remote_path
-    
+    def __init__(self, ssh_url):
+        self.ssh_url = ssh_url
+
+    def open(self):
+        _, remote_user, remote_hostname, remote_port, remote_path = re.search(r"^ssh://(?:([^@:/]+)@)?([^:/]+)(?::(\d+))?(?:/(.*))?$", self.ssh_url)
+
+        if not remote_user:
+            raise ValueError(f"SSH url must include a user: {self.ssh_url}")
+
+        """Establishes an SSH connection."""
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(remote_hostname, username=remote_user, port=int(remote_port) if remote_port else 22)
+        self.sftp = ssh_client.open_sftp()
+        if remote_path:
+            self.sftp.chdir(remote_path)
+
+    def close(self):
+        """Closes the SSH connection."""
+        self.sftp.close()
+
     def upload_file(self, local_path, filename, marked: bool):
-        """Uploads a file to the remote server using SCP."""
-        remote_full_path = f"{self.remote_user}@{self.remote_host}:{os.path.join(self.remote_path, filename)}"
-        subprocess.run(["scp", local_path, remote_full_path], check=True)
+        if marked:
+            # Append "_marked" to the filename before uploading
+            filename = os.path.splitext(filename)[0] + "_marked" + os.path.splitext(filename)[1]
 
+        self.sftp.put(local_path, filename)
 
-def upload_to_target(conn, upload_target):
-    """Phase 2: Connected to internet WiFi. Upload fully downloaded videos to the specified target."""
-    cursor = conn.execute("SELECT filename, marked FROM videos WHERE status = ?", (VideoStatus.DOWNLOADED.value,))
-    videos_to_upload = cursor.fetchall()
+    def __enter__(self):
+        self.open()
+        return self
     
-    if not videos_to_upload:
-        logger.info("No videos are currently staged for upload.")
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+
+def upload_to_target(dbconn):
+    upload_target = None
+    if UPLOAD_TARGET.startswith("gs://"):
+        upload_target = GcsUploadTarget(UPLOAD_TARGET)
+    elif UPLOAD_TARGET.startswith("ssh://"):
+        # Example: ssh://user@host:/path/to/upload
+        upload_target = SshUploadTarget(UPLOAD_TARGET)
+    else:
+        logger.error(f"Unsupported UPLOAD_TARGET: {UPLOAD_TARGET}.")
+        raise ValueError(f"Unsupported UPLOAD_TARGET: {UPLOAD_TARGET}")
+
+
+    """Phase 2: Connected to internet WiFi. Upload fully downloaded videos to the specified target."""
+    cursor = dbconn.execute("SELECT filename, marked FROM videos WHERE status = ?", (VideoStatus.DOWNLOADED.value,))
+    videos = cursor.fetchall()
+    videos_count = len(videos)
+
+    if videos_count == 0:
+        logger.debug("No videos are currently staged for upload.")
         return
 
-    logger.info(f"Preparing to upload {len(videos_to_upload)} videos to target: {UPLOAD_TARGET}")
+    logger.info(f"Preparing to upload {videos_count} videos to target: {UPLOAD_TARGET}")
 
-    try:        
-        for filename, marked in videos_to_upload:
-            local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
-            
-            if not os.path.exists(local_path):
-                logger.warning(f"File {filename} is missing from local storage. Resetting status to 'found'.")
-                conn.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.FOUND.value, filename))
-                conn.commit()
-                continue
+    try:
+        with upload_target: 
+            for filename, marked in videos:
+                local_path = os.path.join(VIDEO_DOWNLOAD_DIR, filename)
                 
-            logger.info(f"Uploading {filename}...")
-            upload_target.upload_file(local_path, filename, marked)
-            
-            # Update database status and immediately delete the local file to free space
-            os.remove(local_path)
-            conn.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.UPLOADED.value, filename))
-            conn.commit()
-            logger.info(f"Successfully uploaded {filename} and removed it from local storage.")
-            
+                if not os.path.exists(local_path):
+                    logger.warning(f"File {filename} is missing from local storage. Resetting status to 'found'.")
+                    dbconn.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.FOUND.value, filename))
+                    dbconn.commit()
+                    continue
+                    
+                logger.debug(f"Uploading {filename}...")
+                upload_target.upload_file(local_path, filename, marked)
+                
+                # Update database status and immediately delete the local file to free space
+                os.remove(local_path)
+                dbconn.execute("UPDATE videos SET status = ? WHERE filename = ?", (VideoStatus.UPLOADED.value, filename))
+                dbconn.commit()
+                logger.info(f"Successfully uploaded {filename} and removed it from local storage.")            
     except Exception as e:
         logger.exception("Error during upload: %s", e)
 
 
 def main():
-
-    upload_target = None
-    if UPLOAD_TARGET.startswith("gs://"):
-        GCS_BUCKET_NAME = UPLOAD_TARGET[5:]  # Extract bucket name from the URL
-        upload_target = GcsUploadTarget(GCS_BUCKET_NAME)
-    elif UPLOAD_TARGET.startswith("ssh://"):
-        # Example: ssh://user@host:/path/to/upload
-        ssh_info = UPLOAD_TARGET[6:]  # Remove 'ssh://'
-        user_host, remote_path = ssh_info.split(":", 1)
-        remote_user, remote_host = user_host.split("@")
-        upload_target = SshUploadTarget(remote_user, remote_host, remote_path)
-    else:
-        logger.error(f"Unsupported UPLOAD_TARGET: {UPLOAD_TARGET}. Exiting.")
-        sys.exit(1)
-
-    
+    ssid = None
     while True:
-        ssid = get_current_ssid()
-        logger.info(f"Current WiFi SSID: '{ssid}'")
+        new_ssid = get_current_ssid()
+        if ssid != new_ssid:
+            logger.info(f"WiFi SSID changed from '{ssid}' to '{new_ssid}'")
+            ssid = new_ssid
         
         if ssid == CAMERA_SSID:
             conn = init_database()
             try:
-                crawl_and_download(conn)
+                start_crawl_and_download(conn)
             finally:
                 conn.close()
         elif ssid == None:
-            logger.info("No WiFi connection. Waiting...")
+            logger.debug("No WiFi connection. Waiting...")
         else:
             conn = init_database()
             try:
-                upload_to_target(conn, upload_target)
+                upload_to_target(conn)
             finally:
                 conn.close()
             
         # Idle sleep interval to avoid unnecessary CPU/battery consumption
-        time.sleep(60)  # Sleep for 1 minute before checking again
+        time.sleep(HEARTBEAT_INTERVAL)  # Sleep for the specified interval before checking again
 
 if __name__ == "__main__":
     main()
