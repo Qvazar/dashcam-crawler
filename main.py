@@ -39,31 +39,7 @@ CHUNK_SIZE = 5 * 1024 * 1024  # 5 MB chunks for download/upload (RAM efficient)
 VIDEO_TEMP_FILENAME = ".~downloading_video.TS"  # Temporary filename for downloading videos before renaming
 
 
-def configure_logging():
-    """Configure console logging and optionally add Google Cloud Logging."""
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)
-
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
-
-    if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
-        try:
-            from google.cloud import logging as google_logging
-        except ImportError:
-            logger = logging.getLogger(__name__)
-            logger.warning("google-cloud-logging is not installed; only console logging will be used")
-        else:
-            try:
-                client = google_logging.Client()
-                handler = client.get_default_handler()
-                handler.setLevel(logging.INFO)
-                root_logger.addHandler(handler)
-            except Exception as exc:
-                logger = logging.getLogger(__name__)
-                logger.warning("Unable to initialize Google Cloud Logging; console logging remains enabled: %s", exc)
-
-
-configure_logging()
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
 # Ensure the download directory exists
@@ -178,7 +154,7 @@ def crawl_url(dbconn, url):
                         (filename, video_path, VideoStatus.FOUND.value, video_recorded_at, marked)
                     )
                     logger.debug(f"Registered video: {video_path}")
-                elif not re.search(r'^\.\.?\/?$', href) and not re.search(r'.*\/$', href):  # Ignore '.' and '..' links and non-directory links
+                elif not re.search(r'^\.?\.?\/?$', href) and not re.search(r'.*\/$', href):  # Ignore '.' and '..' links and non-directory links
                     # Recursively crawl subdirectories
                     crawl_url(dbconn, f"{url}/{href}")
     except Exception as e:
