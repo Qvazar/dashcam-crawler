@@ -12,11 +12,6 @@ export DATA_DIR="/var/dashcam-crawler"
 DEPS=(wireless-tools iproute2 curl sqlite3 python3 python3-pip python3-venv)
 PYTHON="$(command -v python3)"
 
-if [ "$(id -u)" -ne 0 ]; then
-  echo "This script must be run as root."
-  exit 1
-fi
-
 #apt-get update
 #apt-get install -y "${DEPS[@]}"
 
@@ -40,7 +35,7 @@ install -d -m 755 -o "$USER" -g "$USER" "$DATA_DIR"
 
 echo "### Setting up configuration..."
 if [ ! -f "/etc/dashcam-crawler.conf" ]; then
-  install -m 644 "$PROJECT_ROOT/dashcam-crawler.conf" "/etc/dashcam-crawler.conf"
+  sudo install -m 644 "$PROJECT_ROOT/dashcam-crawler.conf" "/etc/dashcam-crawler.conf"
 fi
 
 echo "### Setting up virtual environment and installing Python dependencies..."
@@ -55,11 +50,11 @@ if [ -f "$PROJECT_ROOT/requirements.txt" ]; then
 fi
 
 echo "### Setting up systemd service..."
-systemctl disable --now "$SERVICE_NAME" 2>/dev/null || true
-envsubst < "$PROJECT_ROOT/$SERVICE_NAME" > "$SERVICE_FILE"
-systemctl daemon-reload
-systemctl enable "$SERVICE_NAME"
-systemctl start "$SERVICE_NAME"
+sudo systemctl disable --now "$SERVICE_NAME" 2>/dev/null || true
+envsubst < "$PROJECT_ROOT/$SERVICE_NAME" | sudo tee "$SERVICE_FILE" >/dev/null
+sudo systemctl daemon-reload
+sudo systemctl enable "$SERVICE_NAME"
+sudo systemctl start "$SERVICE_NAME"
 
 echo "### Installation complete."
 echo "The service '$SERVICE_NAME' has been started and enabled."
