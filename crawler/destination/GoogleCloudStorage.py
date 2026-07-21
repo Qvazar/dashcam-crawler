@@ -2,7 +2,7 @@ import os
 from google.cloud import storage
 
 
-class GoogleStorageTarget:
+class GoogleCloudStorage:
     @staticmethod
     def supports_url(url):
         return url.startswith("gs://")

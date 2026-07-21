@@ -3,11 +3,11 @@ set -euo pipefail
 
 export PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export VENV_DIR="$PROJECT_ROOT/.venv"
-export SERVICE_NAME="fitcamx-crawler.service"
+export SERVICE_NAME="dashcam-crawler.service"
 export SERVICE_DIR="/etc/systemd/system"
 export SERVICE_FILE="$SERVICE_DIR/$SERVICE_NAME"
-export USER="fitcamx-crawler"
-export DATA_DIR="/var/fitcamx-crawler"
+export USER="dashcam-crawler"
+export DATA_DIR="/var/dashcam-crawler"
 
 DEPS=(wireless-tools iproute2 curl sqlite3 python3 python3-pip python3-venv)
 PYTHON="$(command -v python3)"
@@ -39,8 +39,8 @@ useradd -d "$DATA_DIR" -m "$USER" 2>/dev/null || true
 install -d -m 755 -o "$USER" -g "$USER" "$DATA_DIR"
 
 echo "### Setting up configuration..."
-if [ ! -f "/etc/fitcamx-crawler.conf" ]; then
-  install -m 644 "$PROJECT_ROOT/fitcamx-crawler.conf" "/etc/fitcamx-crawler.conf"
+if [ ! -f "/etc/dashcam-crawler.conf" ]; then
+  install -m 644 "$PROJECT_ROOT/dashcam-crawler.conf" "/etc/dashcam-crawler.conf"
 fi
 
 echo "### Setting up virtual environment and installing Python dependencies..."
@@ -63,5 +63,5 @@ systemctl start "$SERVICE_NAME"
 
 echo "### Installation complete."
 echo "The service '$SERVICE_NAME' has been started and enabled."
-echo "Configuration file is located at /etc/fitcamx-crawler.conf. Please edit it as needed and restart the service with: systemctl restart $SERVICE_NAME"
+echo "Configuration file is located at /etc/dashcam-crawler.conf. Please edit it as needed and restart the service with: systemctl restart $SERVICE_NAME"
 echo "Logs can be viewed using: journalctl -u $SERVICE_NAME -f"

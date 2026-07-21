@@ -1,7 +1,7 @@
 from urllib.parse import urlsplit
 import paramiko
 
-class SftpTarget:
+class Sftp:
     @staticmethod
     def supports_url(url):
         return url.startswith("sftp://")
@@ -19,10 +19,14 @@ class SftpTarget:
         self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.ssh_client.connect(username=self.user, hostname=self.host, port=self.port, password=self.password)
         self.sftp = self.ssh_client.open_sftp()
+
+        self.sftp.mkdir(self.path, ignore_existing=True)  # Ensure the directory exists
+        self.sftp.chdir(self.path)
+        
         return self
 
     def put(self, file_path, destination_path):
-        self.sftp.put(file_path, f"{self.path}/{destination_path}")
+        self.sftp.put(file_path, destination_path)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.sftp.close()

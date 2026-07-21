@@ -7,7 +7,7 @@ import time
 from . import debug
 from .network import get_current_ssid
 from .source.fitcamx import fitcamx
-from .target import get_target_from_url
+from .destination import get_destination_from_url
 from .videolocalstorage import videolocalstorage
 from .videorecord import VideoStatus
 from .videoregister import VideoRegister
@@ -118,7 +118,7 @@ def main():
     config.log_startup()
 
     source = fitcamx
-    target = get_target_from_url(config.target) if config.target else None
+    target = get_destination_from_url(config.target) if config.target else None
 
     ssid = None
     while True:

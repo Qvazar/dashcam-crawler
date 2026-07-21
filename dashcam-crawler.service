@@ -1,12 +1,12 @@
 [Unit]
-Description=FitcamX Dashcam Crawler
+Description=Dashcam Crawler
 After=network.target
 StartLimitBurst=10
 StartLimitIntervalSec=120
 StartLimitAction=reboot
 
 [Service]
-EnvironmentFile=/etc/fitcamx-crawler.conf
+EnvironmentFile=/etc/dashcam-crawler.conf
 Type=exec
 User=${USER}
 WorkingDirectory=${DATA_DIR}
