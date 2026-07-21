@@ -20,7 +20,7 @@ VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS").split(",")  # Comma
 def _datetime_from_filename(filename) -> datetime:
     """Extracts the recorded timestamp from the video filename, if possible."""
     # Example filename: "20260709112750_036576A.TS" -> recorded_at = "2026-07-09 11:27:50"
-    return datetime.strptime(filename[:15], "%Y%m%d%H%M%S")
+    return datetime.strptime(filename[:14], "%Y%m%d%H%M%S")
 
 def _get_camera_url() -> str:
     camera_ip = get_network_gateway()
@@ -51,8 +51,7 @@ def _crawl_url(url: str):
                 logger.debug(f"Found video: {video_path}")
 
                 yield VideoRecord(filename, video_path, VideoStatus.FOUND, video_recorded_at, marked)
-            elif not re.search(r'^\.\.?\/?$', href) and not re.search(r'.*\/$', href):
-                # Ignore '.' and '..' links and non-directory links
+            elif href.find(".") == -1:  # Likely a directory (no file extension)
                 # Recursively crawl subdirectories
                 yield from _crawl_url(found_url)
 
@@ -74,7 +73,7 @@ class _FitcamXSource:
         video_url = urljoin(camera_url, video.camera_path)
         with requests.get(video_url, stream=True, timeout=15) as video_stream:
             video_stream.raise_for_status()
-            return video_stream.iter_content(chunk_size=2*1024*1024)  # Yield the video stream in chunks for the video
+            yield from video_stream.iter_content(chunk_size=2*1024*1024)  # Yield the video stream in chunks for the video
 
 
 fitcamx = _FitcamXSource()

@@ -10,7 +10,8 @@ EnvironmentFile=/etc/fitcamx-crawler.conf
 Type=exec
 User=${USER}
 WorkingDirectory=${DATA_DIR}
-ExecStart=${VENV_DIR}/bin/python3 ${PROJECT_ROOT}/crawler/main.py
+Environment="PYTHONPATH=${PROJECT_ROOT}"
+ExecStart=${VENV_DIR}/bin/python3 -m crawler.main
 Restart=always
 RestartSec=15
 

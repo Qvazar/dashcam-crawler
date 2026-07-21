@@ -7,27 +7,31 @@ from . import debug
 TEMP_FILENAME = ".~downloading_video.TS"
 
 class _VideoFileStorage:
-    def __init__(self):
-        pass
+    def __init__(self, dirname: str = "./videos"):
+        self.dirname = dirname
 
     @debug.timed
     def store_video(self, video_name:str, data:Iterable[bytes]):
-        with open(TEMP_FILENAME, 'wb') as f:
+        os.makedirs(self.dirname, exist_ok=True)
+
+        final_path = os.path.join(self.dirname, video_name)
+        temp_path = os.path.join(self.dirname, TEMP_FILENAME)
+        with open(temp_path, 'wb') as f:
             for chunk in data:
                 if chunk:
                     f.write(chunk)
             f.flush()
-        os.replace(TEMP_FILENAME, video_name)  # Rename temp file to final filename after successful download
-        return os.path.abspath(video_name)
+        os.replace(temp_path, final_path)  # Rename temp file to final filename after successful download
+        return os.path.abspath(final_path)
 
     def get_video_path(self, video_name:str):
-        path = os.path.abspath(video_name)
+        path = os.path.join(self.dirname, video_name)
         if not os.path.exists(path):
             raise FileNotFoundError(f"Video file {video_name} not found in local storage.")
-        return path
+        return os.path.abspath(path)
 
     def delete_video(self, video_name:str):
-        path = os.path.abspath(video_name)
+        path = os.path.join(self.dirname, video_name)
         if os.path.exists(path):
             os.remove(path)
 

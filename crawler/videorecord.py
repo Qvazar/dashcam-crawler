@@ -11,10 +11,10 @@ class VideoStatus(Enum):
 class VideoRecord:
     """Represents a video file with its metadata."""
     
-    def __init__(self, filename:str, camera_path:str, status:VideoStatus, recorded_at:datetime, marked:bool = False, registered_at:datetime | None = None):
+    def __init__(self, filename:str, camera_path:str, status:str, recorded_at:datetime, marked:bool = False, registered_at:datetime | None = None):
         self.filename = filename
         self.camera_path = camera_path
-        self.status = status
+        self.status = VideoStatus(status)
         self.recorded_at = recorded_at
         self.marked = marked
         self.registered_at = registered_at
