@@ -13,7 +13,7 @@ from .videorecord import VideoStatus
 from .videoregister import VideoRegister
 
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(message)s')
 logger = logging.getLogger(__name__)
 
 
