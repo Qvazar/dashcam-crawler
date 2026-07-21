@@ -1,8 +1,9 @@
 from collections.abc import Iterator
 import logging
 import os
+import signal
 import sys
-import time
+import threading
 
 from . import debug
 from .network import get_current_ssid
@@ -15,6 +16,12 @@ from .videoregister import VideoRegister
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger = logging.getLogger(__name__)
+
+_shutdown_event = threading.Event()
+
+def _handle_shutdown_signal(signum, _frame):
+    logger.info("Received %s. Shutting down gracefully...", signal.Signals(signum).name)
+    _shutdown_event.set()
 
 
 # --- CONFIGURATION ---
@@ -117,13 +124,16 @@ def main():
     config = Config()
     config.log_startup()
 
+    signal.signal(signal.SIGINT, _handle_shutdown_signal)
+    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+
     source = fitcamx
     destination = get_destination_from_url(config.target) if config.target else None
 
     ssid = None
 
     with VideoRegister() as video_register:
-        while True:
+        while not _shutdown_event.is_set():
             try:
                 new_ssid = get_current_ssid()
                 if ssid != new_ssid:
@@ -144,7 +154,9 @@ def main():
                 logger.exception("Unexpected error: %s", e)
 
             # Idle sleep interval to avoid unnecessary CPU/battery consumption
-            time.sleep(config.heartbeat_interval)  # Sleep for the specified interval before checking again
+            _shutdown_event.wait(timeout=config.heartbeat_interval)
+
+    logger.info("Crawler stopped gracefully.")
 
 
 if __name__ == "__main__":
