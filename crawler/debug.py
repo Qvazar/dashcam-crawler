@@ -10,9 +10,9 @@ def timed(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if logger.isEnabledFor(logging.DEBUG):
-            start_time = time.time()
+            start_time = time.perf_counter()
             result = f(*args, **kwargs)
-            end_time = time.time()
+            end_time = time.perf_counter()
             elapsed_time = end_time - start_time
             logger.debug(f"Function {f.__name__} executed in {elapsed_time:.4f} seconds")
             return result
