@@ -114,18 +114,21 @@ def upload_to_destination(video_register:VideoRegister, destination):
         logger.exception("Error during upload: %s", e)
 
 
+def _install_shutdown_handler() -> threading.Event:
+    shutdown_event = threading.Event()
+    def handler(signum, _frame):
+        logger.info("Received signal %d. Shutting down gracefully...", signum)
+        shutdown_event.set()
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
+    return shutdown_event
+
+
 def main():
     config = Config()
     config.log_startup()
 
-    shutdown_event = threading.Event()
-
-    def handle_shutdown_signal(signum, _frame):
-        logger.info("Received signal %d. Shutting down gracefully...", signum)
-        shutdown_event.set()
-
-    signal.signal(signal.SIGINT, handle_shutdown_signal)
-    signal.signal(signal.SIGTERM, handle_shutdown_signal)
+    shutdown_event = _install_shutdown_handler()
 
     source = fitcamx
     destination = get_destination_from_url(config.target) if config.target else None
