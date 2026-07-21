@@ -17,12 +17,6 @@ from .videoregister import VideoRegister
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger = logging.getLogger(__name__)
 
-_shutdown_event = threading.Event()
-
-def _handle_shutdown_signal(signum, _frame):
-    logger.info("Received signal %d. Shutting down gracefully...", signum)
-    _shutdown_event.set()
-
 
 # --- CONFIGURATION ---
 class Config:
@@ -124,8 +118,14 @@ def main():
     config = Config()
     config.log_startup()
 
-    signal.signal(signal.SIGINT, _handle_shutdown_signal)
-    signal.signal(signal.SIGTERM, _handle_shutdown_signal)
+    shutdown_event = threading.Event()
+
+    def handle_shutdown_signal(signum, _frame):
+        logger.info("Received signal %d. Shutting down gracefully...", signum)
+        shutdown_event.set()
+
+    signal.signal(signal.SIGINT, handle_shutdown_signal)
+    signal.signal(signal.SIGTERM, handle_shutdown_signal)
 
     source = fitcamx
     destination = get_destination_from_url(config.target) if config.target else None
@@ -133,7 +133,7 @@ def main():
     ssid = None
 
     with VideoRegister() as video_register:
-        while not _shutdown_event.is_set():
+        while not shutdown_event.is_set():
             try:
                 new_ssid = get_current_ssid()
                 if ssid != new_ssid:
@@ -154,7 +154,7 @@ def main():
                 logger.exception("Unexpected error: %s", e)
 
             # Idle sleep interval to avoid unnecessary CPU/battery consumption
-            _shutdown_event.wait(timeout=config.heartbeat_interval)
+            shutdown_event.wait(timeout=config.heartbeat_interval)
 
     logger.info("Crawler stopped gracefully.")
 
