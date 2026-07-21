@@ -30,8 +30,8 @@ if [ ${#missing_deps[@]} -gt 0 ]; then
 fi
 
 echo "### Setting up user and directories..."
-useradd -d "$DATA_DIR" -m "$USER" 2>/dev/null || true
-install -d -m 755 -o "$USER" -g "$USER" "$DATA_DIR"
+sudo useradd -d "$DATA_DIR" -m "$USER" 2>/dev/null || true
+sudo install -d -m 755 -o "$USER" -g "$USER" "$DATA_DIR"
 
 echo "### Setting up configuration..."
 if [ ! -f "/etc/dashcam-crawler.conf" ]; then
