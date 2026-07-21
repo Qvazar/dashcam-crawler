@@ -1,8 +1,9 @@
 from collections.abc import Iterator
 import logging
 import os
+import signal
 import sys
-import time
+import threading
 
 from . import debug
 from .network import get_current_ssid
@@ -113,9 +114,21 @@ def upload_to_destination(video_register:VideoRegister, destination):
         logger.exception("Error during upload: %s", e)
 
 
+def _install_shutdown_handler() -> threading.Event:
+    shutdown_event = threading.Event()
+    def handler(signum, _frame):
+        logger.info("Received signal %d. Shutting down gracefully...", signum)
+        shutdown_event.set()
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
+    return shutdown_event
+
+
 def main():
     config = Config()
     config.log_startup()
+
+    shutdown_event = _install_shutdown_handler()
 
     source = fitcamx
     destination = get_destination_from_url(config.target) if config.target else None
@@ -123,7 +136,7 @@ def main():
     ssid = None
 
     with VideoRegister() as video_register:
-        while True:
+        while not shutdown_event.is_set():
             try:
                 new_ssid = get_current_ssid()
                 if ssid != new_ssid:
@@ -144,7 +157,9 @@ def main():
                 logger.exception("Unexpected error: %s", e)
 
             # Idle sleep interval to avoid unnecessary CPU/battery consumption
-            time.sleep(config.heartbeat_interval)  # Sleep for the specified interval before checking again
+            shutdown_event.wait(timeout=config.heartbeat_interval)
+
+    logger.info("Crawler stopped gracefully.")
 
 
 if __name__ == "__main__":

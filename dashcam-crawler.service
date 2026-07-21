@@ -14,6 +14,8 @@ Environment="PYTHONPATH=${PROJECT_ROOT}"
 ExecStart=${VENV_DIR}/bin/python3 -m crawler.main
 Restart=always
 RestartSec=15
+KillSignal=SIGTERM
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
