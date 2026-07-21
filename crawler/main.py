@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 _shutdown_event = threading.Event()
 
 def _handle_shutdown_signal(signum, _frame):
-    logger.info("Received %s. Shutting down gracefully...", signal.Signals(signum).name)
+    logger.info("Received signal %d. Shutting down gracefully...", signum)
     _shutdown_event.set()
 
 
