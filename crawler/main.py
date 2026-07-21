@@ -13,7 +13,7 @@ from .videorecord import VideoStatus
 from .videoregister import VideoRegister
 
 
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(message)s')
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(name)s %(message)s')
 logger = logging.getLogger(__name__)
 
 
@@ -87,17 +87,17 @@ def download_videos_from_source(video_register, source, video_recording_window=0
         logger.info("Total downloaded videos: %d", downloaded_count)
 
 @debug.timed
-def upload_to_target(video_register:VideoRegister, target):
+def upload_to_destination(video_register:VideoRegister, destination):
     videos = video_register.find_downloaded_videos()
 
     try:
-        with target: 
+        with destination: 
             for v in videos:
                 try:
                     local_path = videolocalstorage.get_video_path(v.filename)
                     
                     logger.debug("Uploading %s...", v.filename)
-                    target.upload_file(local_path, v.filename, v.marked)
+                    destination.upload_file(local_path, v.filename, v.marked)
 
                     videolocalstorage.delete_video(v.filename)
 
@@ -118,33 +118,34 @@ def main():
     config.log_startup()
 
     source = fitcamx
-    target = get_destination_from_url(config.target) if config.target else None
+    destination = get_destination_from_url(config.target) if config.target else None
 
     ssid = None
-    while True:
-        try:
-            new_ssid = get_current_ssid()
-            if ssid != new_ssid:
-                logger.info("WiFi SSID changed from '%s' to '%s'", ssid, new_ssid)
-                ssid = new_ssid
-            
-            if ssid is None:
-                logger.debug("No WiFi connection. Waiting...")
-            elif ssid == config.camera_ssid:
-                with VideoRegister() as video_register:
-                    register_videos_from_source(video_register, source)
-                    ignore_unmarked_videos(video_register, config.video_extended_marked_window)
-                    download_videos_from_source(video_register, source, config.video_recording_window)
-            else:
-                if target:
-                    with VideoRegister() as video_register:
-                        upload_to_target(video_register, target)
-                        
-        except Exception as e:
-            logger.exception("Unexpected error: %s", e)
 
-        # Idle sleep interval to avoid unnecessary CPU/battery consumption
-        time.sleep(config.heartbeat_interval)  # Sleep for the specified interval before checking again
+    with VideoRegister() as video_register:
+        while True:
+            try:
+                new_ssid = get_current_ssid()
+                if ssid != new_ssid:
+                    logger.info("WiFi SSID changed from '%s' to '%s'", ssid, new_ssid)
+                    ssid = new_ssid
+                
+                if ssid is None:
+                    logger.debug("No WiFi connection. Waiting...")
+                elif ssid == config.camera_ssid:
+                        register_videos_from_source(video_register, source)
+                        ignore_unmarked_videos(video_register, config.video_extended_marked_window)
+                        download_videos_from_source(video_register, source, config.video_recording_window)
+                else:
+                    if destination:
+                        upload_to_destination(video_register, destination)
+                        
+            except Exception as e:
+                logger.exception("Unexpected error: %s", e)
+
+            # Idle sleep interval to avoid unnecessary CPU/battery consumption
+            time.sleep(config.heartbeat_interval)  # Sleep for the specified interval before checking again
+
 
 if __name__ == "__main__":
     main()
