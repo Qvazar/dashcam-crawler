@@ -2,7 +2,7 @@
 
 PACKAGE        := dashcam-crawler
 DESTDIR        := $(CURDIR)/debian/$(PACKAGE)
-INSTALL_PREFIX := /opt/dashcam-crawler
+INSTALL_PREFIX := /usr/lib/dashcam-crawler
 SYSTEMD_DIR    := /usr/lib/systemd/system
 
 # Allow pip to install outside a virtual environment inside the build sandbox.

@@ -1,5 +1,7 @@
-dashcam-crawler (0.0.0) unstable; urgency=low
+dashcam-crawler (0.0.0) trixie; urgency=low
 
-  * Initial Debian packaging.
+  * Initial Debian Trixie packaging.
+  * Install packaged Python payload under /usr/lib/dashcam-crawler
+    instead of /opt/dashcam-crawler.
 
  -- Qvazar <noreply@github.com>  Tue, 22 Jul 2026 20:00:00 +0000

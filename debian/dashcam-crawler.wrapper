@@ -3,5 +3,5 @@
 # Determines the site-packages path under the install prefix at runtime,
 # so the package survives a Python minor-version upgrade without modification.
 PYVER=$(python3 -c 'import sys; print("python{}.{}".format(*sys.version_info[:2]))')
-export PYTHONPATH="/opt/dashcam-crawler/lib/$PYVER/site-packages${PYTHONPATH:+:$PYTHONPATH}"
-exec /opt/dashcam-crawler/bin/dashcam-crawler "$@"
+export PYTHONPATH="/usr/lib/dashcam-crawler/lib/$PYVER/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+exec /usr/lib/dashcam-crawler/bin/dashcam-crawler "$@"
