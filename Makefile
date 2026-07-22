@@ -22,6 +22,10 @@ install: check-deps venv
 	sudo install -d -m 755 -o "$(USER)" -g "$(USER)" "$(DATA_DIR)"
 
 	@echo "### Setting up configuration..."
+	if [ ! -f "$(PROJECT_ROOT)/dashcam-crawler.conf" ]; then \
+		echo "Error: Missing source config file $(PROJECT_ROOT)/dashcam-crawler.conf"; \
+		exit 1; \
+	fi
 	if [ ! -f "$(CONFIG_FILE)" ]; then \
 		sudo install -m 644 "$(PROJECT_ROOT)/dashcam-crawler.conf" "$(CONFIG_FILE)"; \
 	fi
@@ -74,6 +78,10 @@ check-deps:
 
 venv:
 	@echo "### Setting up virtual environment and installing Python dependencies..."
+	if [ -z "$(PYTHON)" ]; then \
+		echo "Error: python3 is not installed or not in PATH."; \
+		exit 1; \
+	fi
 	if [ ! -d "$(VENV_DIR)" ]; then \
 		"$(PYTHON)" -m venv "$(VENV_DIR)"; \
 	fi
@@ -81,4 +89,6 @@ venv:
 	"$(VENV_DIR)/bin/pip" install --upgrade pip
 	if [ -f "$(PROJECT_ROOT)/requirements.txt" ]; then \
 		"$(VENV_DIR)/bin/pip" install -r "$(PROJECT_ROOT)/requirements.txt"; \
+	else \
+		echo "### No requirements.txt found, skipping dependency installation."; \
 	fi
