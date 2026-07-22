@@ -25,10 +25,11 @@ class VideoRegister:
         """Connects to SQLite using strict power-failure protection settings."""
         logger.debug("Entered _init_database()")
 
-        conn = sqlite3.connect(DB_FILENAME, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False)
+        conn = sqlite3.connect(DB_FILENAME, detect_types=sqlite3.PARSE_DECLTYPES)
         # WAL mode and FULL synchronization protect against corruption during power cuts
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous = FULL;")
+        conn.autocommit = False  # Ensure transactions are committed explicitly
         
         conn.execute('''
             CREATE TABLE IF NOT EXISTS videos (
