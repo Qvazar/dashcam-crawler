@@ -6,7 +6,7 @@ StartLimitIntervalSec=120
 StartLimitAction=reboot
 
 [Service]
-EnvironmentFile=/etc/dashcam-crawler.conf
+EnvironmentFile=${CONFIG_FILE}
 Type=exec
 User=${USER}
 WorkingDirectory=${DATA_DIR}

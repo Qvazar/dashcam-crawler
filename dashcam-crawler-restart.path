@@ -2,7 +2,7 @@
 Description=Watch Dashcam Crawler config changes
 
 [Path]
-PathChanged=/etc/dashcam-crawler.conf
+PathChanged=${CONFIG_FILE}
 Unit=dashcam-crawler-restart.service
 
 [Install]
