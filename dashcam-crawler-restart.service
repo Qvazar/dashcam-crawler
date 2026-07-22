@@ -1,5 +1,6 @@
 [Unit]
 Description=Restart Dashcam Crawler after config changes
+After=dashcam-crawler.service
 
 [Service]
 Type=oneshot

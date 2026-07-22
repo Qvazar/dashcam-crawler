@@ -39,8 +39,8 @@ install: check-deps venv
 
 	@echo "### Setting up systemd service..."
 	# Disable any running instance before overwriting; errors are ignored if not installed yet.
-	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
 	sudo systemctl disable --now "$(RESTART_PATH_NAME)" 2>/dev/null || true
+	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
 	if [ ! -f "$(PROJECT_ROOT)/$(SERVICE_NAME)" ]; then \
 		echo "Error: Missing service template $(PROJECT_ROOT)/$(SERVICE_NAME)"; \
 		exit 1; \
