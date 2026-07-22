@@ -5,8 +5,12 @@
 PROJECT_ROOT := $(shell pwd)
 VENV_DIR     := $(PROJECT_ROOT)/.venv
 SERVICE_NAME := dashcam-crawler.service
+RESTART_SERVICE_NAME := dashcam-crawler-restart.service
+RESTART_PATH_NAME := dashcam-crawler-restart.path
 SERVICE_DIR  := /etc/systemd/system
 SERVICE_FILE := $(SERVICE_DIR)/$(SERVICE_NAME)
+RESTART_SERVICE_FILE := $(SERVICE_DIR)/$(RESTART_SERVICE_NAME)
+RESTART_PATH_FILE := $(SERVICE_DIR)/$(RESTART_PATH_NAME)
 CONFIG_FILE := /etc/dashcam-crawler.conf
 USER         := dashcam-crawler
 DATA_DIR     := /var/dashcam-crawler
@@ -36,24 +40,42 @@ install: check-deps venv
 	@echo "### Setting up systemd service..."
 	# Disable any running instance before overwriting; errors are ignored if not installed yet.
 	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
+	sudo systemctl disable --now "$(RESTART_PATH_NAME)" 2>/dev/null || true
 	if [ ! -f "$(PROJECT_ROOT)/$(SERVICE_NAME)" ]; then \
 		echo "Error: Missing service template $(PROJECT_ROOT)/$(SERVICE_NAME)"; \
 		exit 1; \
 	fi
+	if [ ! -f "$(PROJECT_ROOT)/$(RESTART_SERVICE_NAME)" ]; then \
+		echo "Error: Missing service template $(PROJECT_ROOT)/$(RESTART_SERVICE_NAME)"; \
+		exit 1; \
+	fi
+	if [ ! -f "$(PROJECT_ROOT)/$(RESTART_PATH_NAME)" ]; then \
+		echo "Error: Missing path template $(PROJECT_ROOT)/$(RESTART_PATH_NAME)"; \
+		exit 1; \
+	fi
 	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" CONFIG_FILE="$(CONFIG_FILE)" \
 		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)"
+	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" CONFIG_FILE="$(CONFIG_FILE)" \
+		envsubst < "$(PROJECT_ROOT)/$(RESTART_SERVICE_NAME)" | sudo tee "$(RESTART_SERVICE_FILE)"
+	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" CONFIG_FILE="$(CONFIG_FILE)" \
+		envsubst < "$(PROJECT_ROOT)/$(RESTART_PATH_NAME)" | sudo tee "$(RESTART_PATH_FILE)"
 	sudo systemctl daemon-reload
 	sudo systemctl enable "$(SERVICE_NAME)"
+	sudo systemctl enable "$(RESTART_PATH_NAME)"
 	sudo systemctl start "$(SERVICE_NAME)"
+	sudo systemctl start "$(RESTART_PATH_NAME)"
 
 	@echo "### Installation complete."
 	@echo "The service '$(SERVICE_NAME)' has been started and enabled."
-	@echo "Configuration file is located at $(CONFIG_FILE). Please edit it as needed and restart the service with: sudo systemctl restart $(SERVICE_NAME)"
+	@echo "Configuration file is located at $(CONFIG_FILE). Changes are watched automatically and restart $(SERVICE_NAME)."
 	@echo "Logs can be viewed using: sudo journalctl -u $(SERVICE_NAME) -f"
 
 uninstall:
 	@echo "### Stopping and disabling systemd service..."
+	sudo systemctl disable --now "$(RESTART_PATH_NAME)" 2>/dev/null || true
 	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
+	sudo rm -f "$(RESTART_PATH_FILE)"
+	sudo rm -f "$(RESTART_SERVICE_FILE)"
 	sudo rm -f "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
 
