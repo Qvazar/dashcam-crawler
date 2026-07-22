@@ -20,59 +20,64 @@ The crawler loop:
 
 ## Requirements
 
-- Linux system with `iwgetid` and `ip` commands available.
-- Python 3.10+ (3.11 recommended).
+- Debian/Ubuntu-based Linux system (the Makefile uses `dpkg`/`apt`).
+- `sudo` access (required for service install/uninstall).
 - Network setup that can connect to both:
   - the dashcam Wi-Fi
   - an upload network (home Wi-Fi, hotspot, etc.)
 
-Python dependencies are listed in `requirements.txt`:
-- `requests`
-- `beautifulsoup4`
-- `google-cloud-storage`
-- `paramiko`
+Python dependencies are installed automatically by `make install` from `requirements.txt`.
 
-## Quick start (manual run)
+## Installation and lifecycle (make + systemd)
 
-### 1) Create virtual environment
+### 1) Configure environment file
+
+Create and edit the runtime config:
 
 ```bash
 cd /path/to/dashcam-crawler
-./setup_venv.sh
-```
-
-### 2) Configure environment
-
-Copy the sample config and edit values:
-
-```bash
 sudo cp ./dashcam-crawler.conf /etc/dashcam-crawler.conf
 sudo nano /etc/dashcam-crawler.conf
 ```
 
-Minimum required values:
+Required values:
 
 - `CAMERA_SSID`: SSID of your dashcam Wi-Fi.
 - `TARGET`: upload destination URL (see below).
 
-Useful optional values:
-
-- `HEARTBEAT_INTERVAL` (default `60`)
-- `VIDEO_RECORDING_WINDOW` (default `2`)
-- `VIDEO_EXTENDED_MARKED_WINDOW` (default `0`)
-- `VIDEO_EXTENSIONS` (default `.TS`)
-- `FITCAMX_MARKED_VIDEO_DIRS` (default `CARDV/EMR/,CARDV/EMR_E/`)
-
-### 3) Run the crawler
+### 2) Install and start the service
 
 ```bash
 cd /path/to/dashcam-crawler
-source .venv/bin/activate
-set -a
-source /etc/dashcam-crawler.conf
-set +a
-python -m crawler.main
+make install
 ```
+
+`make install` will:
+- install missing system dependencies
+- create a local virtual environment and install Python dependencies
+- create system user `dashcam-crawler`
+- create `/var/dashcam-crawler`
+- install `/etc/dashcam-crawler.conf` if missing
+- render and install `dashcam-crawler.service`
+- enable and start the systemd service
+
+### 3) Service operations
+
+```bash
+sudo systemctl status dashcam-crawler.service
+sudo systemctl restart dashcam-crawler.service
+sudo journalctl -u dashcam-crawler.service -f
+```
+
+### 4) Uninstall
+
+```bash
+cd /path/to/dashcam-crawler
+make uninstall
+```
+
+`make uninstall` stops/disables the service and removes service/user/data/venv resources.  
+It keeps `/etc/dashcam-crawler.conf` in place.
 
 ## Upload targets
 
@@ -91,32 +96,15 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 in your config file so the Google client can authenticate.
 
-## Run as a systemd service
+## Automatic restart and recovery behavior
 
-This repository includes:
-- `dashcam-crawler.service` (template)
-- `Makefile` with install/uninstall automation
+The installed service is configured for unattended operation:
 
-Install and enable the service:
-
-```bash
-cd /path/to/dashcam-crawler
-make install
-```
-
-Useful commands:
-
-```bash
-sudo systemctl status dashcam-crawler.service
-sudo systemctl restart dashcam-crawler.service
-sudo journalctl -u dashcam-crawler.service -f
-```
-
-Uninstall:
-
-```bash
-make uninstall
-```
+- `Restart=always`: always restart if the crawler exits.
+- `RestartSec=15`: wait 15 seconds between restart attempts.
+- `StartLimitBurst=10` and `StartLimitIntervalSec=120`: if too many restarts happen quickly, systemd considers it unstable.
+- `StartLimitAction=reboot`: when the start limit is hit, system reboots to recover.
+- `KillSignal=SIGTERM` and `TimeoutStopSec=30`: graceful shutdown is attempted before forced termination.
 
 ## Wi-Fi prioritization example
 
@@ -131,6 +119,40 @@ By default (working directory dependent):
 - Downloaded videos: `./videos/`
 
 When installed via `make install`, the service runs as user `dashcam-crawler` with working directory `/var/dashcam-crawler`.
+
+## Configuration reference
+
+`/etc/dashcam-crawler.conf` values:
+
+### Required
+
+- `CAMERA_SSID`  
+  Wi-Fi SSID used by the camera. The crawler only crawls/downloads while connected to this SSID.
+
+- `TARGET`  
+  Upload destination URL. Supported formats:
+  - `gs://bucket-name/optional/prefix`
+  - `sftp://host:22/path`
+
+### Optional
+
+- `GOOGLE_APPLICATION_CREDENTIALS`  
+  Path to a Google service account JSON key. Needed for `gs://` targets.
+
+- `HEARTBEAT_INTERVAL` (default: `60`)  
+  Main loop sleep interval in seconds. Lower values react faster to network changes; higher values reduce activity.
+
+- `VIDEO_RECORDING_WINDOW` (default: `2`)  
+  Minutes to wait before downloading newly discovered files. Helps avoid reading files still being recorded.
+
+- `VIDEO_EXTENDED_MARKED_WINDOW` (default: `0`)  
+  Minutes before/after a marked video in which unmarked videos are still kept. Unmarked videos outside this window are set to ignored.
+
+- `VIDEO_EXTENSIONS` (default: `.TS`)  
+  Comma-separated video filename extensions to crawl (for example `.TS,.MP4`).
+
+- `FITCAMX_MARKED_VIDEO_DIRS` (default: `CARDV/EMR/,CARDV/EMR_E/`)  
+  Comma-separated camera path fragments treated as “marked” event directories.
 
 ## Troubleshooting
 
