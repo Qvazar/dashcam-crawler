@@ -40,7 +40,7 @@ install: check-deps venv
 		echo "Error: Missing service template $(PROJECT_ROOT)/$(SERVICE_NAME)"; \
 		exit 1; \
 	fi
-	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" \
+	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" CONFIG_FILE="$(CONFIG_FILE)" \
 		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
 	sudo systemctl enable "$(SERVICE_NAME)"
@@ -48,8 +48,8 @@ install: check-deps venv
 
 	@echo "### Installation complete."
 	@echo "The service '$(SERVICE_NAME)' has been started and enabled."
-	@echo "Configuration file is located at $(CONFIG_FILE). Please edit it as needed and restart the service with: systemctl restart $(SERVICE_NAME)"
-	@echo "Logs can be viewed using: journalctl -u $(SERVICE_NAME) -f"
+	@echo "Configuration file is located at $(CONFIG_FILE). Please edit it as needed and restart the service with: sudo systemctl restart $(SERVICE_NAME)"
+	@echo "Logs can be viewed using: sudo journalctl -u $(SERVICE_NAME) -f"
 
 uninstall:
 	@echo "### Stopping and disabling systemd service..."
