@@ -1,0 +1,5 @@
+dashcam-crawler (0.0.0) unstable; urgency=low
+
+  * Initial Debian packaging.
+
+ -- Qvazar <noreply@github.com>  Tue, 22 Jul 2026 20:00:00 +0000
