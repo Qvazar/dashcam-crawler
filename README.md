@@ -1,6 +1,6 @@
 # dashcam-crawler
 
-`dashcam-crawler` is a Python service for automatically collecting dashcam videos from a FitcamX camera when your device is connected to the camera Wi-Fi, then uploading those videos when the device switches back to another network.
+`dashcam-crawler` is a Python service for automatically collecting dashcam videos from a FitcamX camera when your device is connected to the camera Wi-Fi, then uploading those videos when the device switches to a non-camera network.
 
 It is designed to run continuously (for example on a Raspberry Pi) and keeps a local SQLite register so videos are only processed once.
 
@@ -30,22 +30,7 @@ Python dependencies are installed automatically by `make install` from `requirem
 
 ## Installation and lifecycle (make + systemd)
 
-### 1) Configure environment file
-
-Create and edit the runtime config:
-
-```bash
-cd /path/to/dashcam-crawler
-sudo cp ./dashcam-crawler.conf /etc/dashcam-crawler.conf
-sudo nano /etc/dashcam-crawler.conf
-```
-
-Required values:
-
-- `CAMERA_SSID`: SSID of your dashcam Wi-Fi.
-- `TARGET`: upload destination URL (see below).
-
-### 2) Install and start the service
+### 1) Install and start the service
 
 ```bash
 cd /path/to/dashcam-crawler
@@ -61,11 +46,25 @@ make install
 - render and install `dashcam-crawler.service`
 - enable and start the systemd service
 
+### 2) Edit configuration
+
+After installation, edit the runtime config:
+
+```bash
+sudo nano /etc/dashcam-crawler.conf
+```
+
+Required values:
+
+- `CAMERA_SSID`: SSID of your dashcam Wi-Fi.
+- `TARGET`: upload destination URL (see below).
+
+Changes to `/etc/dashcam-crawler.conf` are applied automatically because the service restarts when the config file is updated.
+
 ### 3) Service operations
 
 ```bash
 sudo systemctl status dashcam-crawler.service
-sudo systemctl restart dashcam-crawler.service
 sudo journalctl -u dashcam-crawler.service -f
 ```
 
