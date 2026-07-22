@@ -24,6 +24,7 @@ install: check-deps venv
 	@echo "### Setting up configuration..."
 	if [ ! -f "$(PROJECT_ROOT)/dashcam-crawler.conf" ]; then \
 		echo "Error: Missing source config file $(PROJECT_ROOT)/dashcam-crawler.conf"; \
+		echo "Please ensure dashcam-crawler.conf exists in the project root directory."; \
 		exit 1; \
 	fi
 	if [ ! -f "$(CONFIG_FILE)" ]; then \
@@ -33,6 +34,10 @@ install: check-deps venv
 	@echo "### Setting up systemd service..."
 	# Disable any running instance before overwriting; errors are ignored if not installed yet.
 	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
+	if [ ! -f "$(PROJECT_ROOT)/$(SERVICE_NAME)" ]; then \
+		echo "Error: Missing service template $(PROJECT_ROOT)/$(SERVICE_NAME)"; \
+		exit 1; \
+	fi
 	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" \
 		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
@@ -90,5 +95,5 @@ venv:
 	if [ -f "$(PROJECT_ROOT)/requirements.txt" ]; then \
 		"$(VENV_DIR)/bin/pip" install -r "$(PROJECT_ROOT)/requirements.txt"; \
 	else \
-		echo "### No requirements.txt found, skipping dependency installation."; \
+		echo "### No requirements.txt found; Python dependency installation is skipped (this is expected if no extra Python packages are needed)."; \
 	fi
