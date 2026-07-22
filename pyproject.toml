@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dashcam-crawler"
+version = "0.0.0"
+requires-python = ">=3.13"
+dependencies = [
+    "requests",
+    "beautifulsoup4",
+    "google-cloud-storage",
+    "paramiko",
+]
+
+[project.scripts]
+dashcam-crawler = "crawler.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["crawler*"]

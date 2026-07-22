@@ -209,6 +209,14 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# Debian packaging build artifacts
+debian/.debhelper/
+debian/dashcam-crawler/
+debian/files
+debian/*.debhelper
+debian/*.substvars
+debian/tmp/
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
