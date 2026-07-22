@@ -106,11 +106,48 @@ The installed service is configured for unattended operation:
 - `StartLimitAction=reboot`: when the start limit is hit, system reboots to recover.
 - `KillSignal=SIGTERM` and `TimeoutStopSec=30`: graceful shutdown is attempted before forced termination.
 
-## Wi-Fi prioritization example
+## Raspberry Pi Wi-Fi setup with `nmcli`
 
-See `./wpa_supplicant.conf.example` for an example where:
-- camera Wi-Fi has higher priority
-- home/hotspot networks are fallback upload networks
+On Raspberry Pi systems using NetworkManager, you can manage the Wi-Fi profiles with `nmcli`.
+
+Example connections:
+
+```bash
+sudo nmcli connection add \
+  type wifi \
+  ifname wlan0 \
+  con-name dashcam \
+  ssid "MyVideoCameraWiFi"
+
+sudo nmcli connection modify dashcam \
+  wifi-sec.key-mgmt wpa-psk \
+  wifi-sec.psk "camera-password" \
+  connection.autoconnect yes \
+  connection.autoconnect-priority 100
+
+sudo nmcli connection add \
+  type wifi \
+  ifname wlan0 \
+  con-name home \
+  ssid "MyHomeWiFi"
+
+sudo nmcli connection modify home \
+  wifi-sec.key-mgmt wpa-psk \
+  wifi-sec.psk "home-password" \
+  connection.autoconnect yes \
+  connection.autoconnect-priority 50
+```
+
+This gives the camera network higher priority, so the Pi prefers it when the camera is available, and falls back to the home network for uploads when the camera is out of range.
+
+Useful commands:
+
+```bash
+nmcli connection show
+nmcli device wifi list
+nmcli connection up dashcam
+nmcli connection up home
+```
 
 ## Data written by the crawler
 
