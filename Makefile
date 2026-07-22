@@ -40,10 +40,6 @@ install: check-deps venv
 		echo "Error: Missing service template $(PROJECT_ROOT)/$(SERVICE_NAME)"; \
 		exit 1; \
 	fi
-	if ! command -v envsubst >/dev/null 2>&1; then \
-		echo "Error: envsubst is required. Please install gettext."; \
-		exit 1; \
-	fi
 	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" \
 		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
@@ -61,7 +57,11 @@ uninstall:
 	sudo rm -f "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
 
-	@echo "### Keeping configuration file at $(CONFIG_FILE)"
+	@if [ -f "$(CONFIG_FILE)" ]; then \
+		echo "### Keeping configuration file at $(CONFIG_FILE)"; \
+	else \
+		echo "### No configuration file found at $(CONFIG_FILE); nothing to remove."; \
+	fi
 
 	@echo "### Removing user and data directory..."
 	# userdel may fail if the user doesn't exist or has running processes; errors are ignored.
