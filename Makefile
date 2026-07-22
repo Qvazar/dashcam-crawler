@@ -17,7 +17,7 @@ DEPS         := wireless-tools iproute2 sqlite3 python3 python3-pip python3-venv
 
 install: check-deps venv
 	@echo "### Setting up user and directories..."
-	# Exit code 9 means the user already exists, which is acceptable.
+	# Ignore errors here so repeated installs continue if the user already exists.
 	sudo useradd -d "$(DATA_DIR)" -m "$(USER)" 2>/dev/null || true
 	sudo install -d -m 755 -o "$(USER)" -g "$(USER)" "$(DATA_DIR)"
 
@@ -30,7 +30,7 @@ install: check-deps venv
 	# Disable any running instance before overwriting; errors are ignored if not installed yet.
 	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
 	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" \
-		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)" >/dev/null
+		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
 	sudo systemctl enable "$(SERVICE_NAME)"
 	sudo systemctl start "$(SERVICE_NAME)"
