@@ -37,7 +37,7 @@ Python dependencies are listed in `requirements.txt`:
 ### 1) Create virtual environment
 
 ```bash
-cd /home/runner/work/dashcam-crawler/dashcam-crawler
+cd /path/to/dashcam-crawler
 ./setup_venv.sh
 ```
 
@@ -46,7 +46,7 @@ cd /home/runner/work/dashcam-crawler/dashcam-crawler
 Copy the sample config and edit values:
 
 ```bash
-cp /home/runner/work/dashcam-crawler/dashcam-crawler/dashcam-crawler.conf /etc/dashcam-crawler.conf
+sudo cp ./dashcam-crawler.conf /etc/dashcam-crawler.conf
 sudo nano /etc/dashcam-crawler.conf
 ```
 
@@ -66,7 +66,7 @@ Useful optional values:
 ### 3) Run the crawler
 
 ```bash
-cd /home/runner/work/dashcam-crawler/dashcam-crawler
+cd /path/to/dashcam-crawler
 source .venv/bin/activate
 set -a
 source /etc/dashcam-crawler.conf
@@ -100,7 +100,7 @@ This repository includes:
 Install and enable the service:
 
 ```bash
-cd /home/runner/work/dashcam-crawler/dashcam-crawler
+cd /path/to/dashcam-crawler
 make install
 ```
 
@@ -120,7 +120,7 @@ make uninstall
 
 ## Wi‑Fi prioritization example
 
-See `/home/runner/work/dashcam-crawler/dashcam-crawler/wpa_supplicant.conf.example` for an example where:
+See `./wpa_supplicant.conf.example` for an example where:
 - camera Wi‑Fi has higher priority
 - home/hotspot networks are fallback upload networks
 
