@@ -84,7 +84,7 @@ check-deps:
 	if [ -n "$$missing" ]; then \
 		echo "### Installing missing dependencies:$$missing"; \
 		sudo apt-get update; \
-		sudo apt-get install -y $$missing; \
+		sudo apt-get install $$missing; \
 	fi
 
 venv:
