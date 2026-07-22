@@ -97,5 +97,5 @@ venv:
 	if [ -f "$(PROJECT_ROOT)/requirements.txt" ]; then \
 		"$(VENV_DIR)/bin/pip" install -r "$(PROJECT_ROOT)/requirements.txt"; \
 	else \
-		echo "### No requirements.txt found; Python dependency installation is skipped (this is expected if no extra Python packages are needed)."; \
+		echo "### Warning: no requirements.txt found; skipping Python dependency installation."; \
 	fi
