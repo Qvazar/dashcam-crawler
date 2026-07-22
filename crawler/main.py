@@ -105,7 +105,7 @@ def upload_to_destination(video_register:VideoRegister, destination):
                     local_path = videolocalstorage.get_video_path(v.filename)
                     
                     logger.debug("Uploading %s...", v.filename)
-                    destination.upload_file(local_path, v.filename, v.marked)
+                    destination.put(local_path, v.filename, v.marked)
 
                     videolocalstorage.delete_video(v.filename)
 
