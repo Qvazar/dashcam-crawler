@@ -9,7 +9,7 @@ export SERVICE_FILE="$SERVICE_DIR/$SERVICE_NAME"
 export USER="dashcam-crawler"
 export DATA_DIR="/var/dashcam-crawler"
 
-DEPS=(wireless-tools iproute2 curl sqlite3 python3 python3-pip python3-venv)
+DEPS=(wireless-tools iproute2 sqlite3 python3 python3-pip python3-venv)
 PYTHON="$(command -v python3)"
 
 #apt-get update
