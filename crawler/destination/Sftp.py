@@ -1,5 +1,6 @@
 from urllib.parse import urlsplit
 import paramiko
+import os
 
 class Sftp:
     @staticmethod
@@ -25,10 +26,12 @@ class Sftp:
         
         return self
 
-    def put(self, file_path, destination_path):
+    def put(self, file_path, destination_path, marked: bool = False):
+        if marked:
+            base, ext = os.path.splitext(destination_path)
+            destination_path = f"{base}_marked{ext}"
         self.sftp.put(file_path, destination_path)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.sftp.close()
         self.ssh_client.close()
-    

@@ -17,8 +17,10 @@ class GoogleCloudStorage:
         self.bucket = self.client.bucket(self.bucket_name)
         return self
 
-    def put(self, file_path, destination_path):
+    def put(self, file_path, destination_path, marked: bool = False):
         blob = self.bucket.blob(os.path.join(self.prefix, destination_path) if self.prefix else destination_path)
+        if marked:
+            blob.metadata = {"marked": "true"}
         blob.upload_from_filename(file_path)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
