@@ -15,6 +15,6 @@ class VideoRecord:
         self.filename = filename
         self.camera_path = camera_path
         self.status = VideoStatus(status)
-        self.recorded_at = recorded_at
+        self.recorded_at = datetime.fromisoformat(recorded_at) if not isinstance(recorded_at, datetime) else recorded_at
         self.marked = marked
-        self.registered_at = registered_at
+        self.registered_at = datetime.fromisoformat(registered_at) if registered_at and not isinstance(registered_at, datetime) else registered_at

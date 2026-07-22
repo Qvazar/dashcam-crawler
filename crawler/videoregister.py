@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from datetime import datetime
 import logging
 import sqlite3
 
@@ -8,6 +9,10 @@ from .videorecord import VideoRecord, VideoStatus
 DB_FILENAME = "./videos.db"
 
 logger = logging.getLogger(__name__)
+
+sqlite3.register_adapter(datetime, lambda val: val.replace(tzinfo=None).isoformat(timespec='seconds'))
+sqlite3.register_converter("DATETIME", lambda val: datetime.fromisoformat(val.decode("utf-8")) if val else None)
+
 
 class VideoRegister:
     """Handles database operations for video records."""
@@ -20,7 +25,7 @@ class VideoRegister:
         """Connects to SQLite using strict power-failure protection settings."""
         logger.debug("Entered _init_database()")
 
-        conn = sqlite3.connect(DB_FILENAME)
+        conn = sqlite3.connect(DB_FILENAME, detect_types=sqlite3.PARSE_DECLTYPES, autocommit=False)
         # WAL mode and FULL synchronization protect against corruption during power cuts
         conn.execute("PRAGMA journal_mode=WAL;")
         conn.execute("PRAGMA synchronous = FULL;")
@@ -30,9 +35,9 @@ class VideoRegister:
                 filename TEXT PRIMARY KEY,
                 camera_path TEXT NOT NULL,
                 status TEXT NOT NULL, -- uses values from VideoStatus enum
-                recorded_at TIMESTAMP NOT NULL,
+                recorded_at DATETIME NOT NULL,
                 marked BOOLEAN DEFAULT 0,
-                registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status)")
@@ -100,7 +105,7 @@ class VideoRegister:
                         SELECT 1 FROM videos AS marked_v
                         WHERE marked_v.marked = 1
                         AND marked_v.status = ?
-                        AND videos.recorded_at BETWEEN datetime(marked_v.recorded_at, ?) AND datetime(marked_v.recorded_at, ?)
+                        AND datetime(videos.recorded_at) BETWEEN datetime(marked_v.recorded_at, ?) AND datetime(marked_v.recorded_at, ?)
                     )
                 """,
                 (
@@ -123,7 +128,7 @@ class VideoRegister:
             # This is done by checking if the registered_at is older than a certain window (video_recording_window) from the current db time.
             cursor = self._db_conn.execute(
                 """
-                SELECT filename, camera_path, status, recorded_at, marked
+                SELECT filename, camera_path, status, recorded_at, marked, registered_at
                 FROM videos
                 WHERE status = ?
                     AND (registered_at <= datetime('now', ?))
@@ -139,7 +144,7 @@ class VideoRegister:
         with self._db_conn:
             cursor = self._db_conn.execute(
                 """
-                SELECT filename, camera_path, status, recorded_at, marked
+                SELECT filename, camera_path, status, recorded_at, marked, registered_at
                 FROM videos
                 WHERE status = ?
                 """,
