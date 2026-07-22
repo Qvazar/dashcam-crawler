@@ -83,7 +83,7 @@ It keeps `/etc/dashcam-crawler.conf` in place.
 `TARGET` currently supports:
 
 - Google Cloud Storage: `gs://bucket-name/optional/prefix`
-- SFTP: `sftp://host:22/path`
+- SFTP: `sftp://user:password@host:port/path`
 
 ### Google Cloud Storage authentication
 
@@ -168,7 +168,7 @@ When installed via `make install`, the service runs as user `dashcam-crawler` wi
 - `TARGET`  
   Upload destination URL. Supported formats:
   - `gs://bucket-name/optional/prefix`
-  - `sftp://host:22/path`
+  - `sftp://user:password@host:port/path`
 
 ### Optional
 
