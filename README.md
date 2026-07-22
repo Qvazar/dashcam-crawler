@@ -1,6 +1,6 @@
 # dashcam-crawler
 
-`dashcam-crawler` is a Python service for automatically collecting dashcam videos from a FitcamX camera when your device is connected to the camera Wi‑Fi, then uploading those videos when the device switches back to another network.
+`dashcam-crawler` is a Python service for automatically collecting dashcam videos from a FitcamX camera when your device is connected to the camera Wi-Fi, then uploading those videos when the device switches back to another network.
 
 It is designed to run continuously (for example on a Raspberry Pi) and keeps a local SQLite register so videos are only processed once.
 
@@ -8,7 +8,7 @@ It is designed to run continuously (for example on a Raspberry Pi) and keeps a l
 
 The crawler loop:
 
-1. Checks the current Wi‑Fi SSID.
+1. Checks the current Wi-Fi SSID.
 2. If connected to the camera SSID:
    - Crawls the camera HTTP file listing.
    - Registers discovered videos in SQLite (`videos.db`).
@@ -23,8 +23,8 @@ The crawler loop:
 - Linux system with `iwgetid` and `ip` commands available.
 - Python 3.10+ (3.11 recommended).
 - Network setup that can connect to both:
-  - the dashcam Wi‑Fi
-  - an upload network (home Wi‑Fi, hotspot, etc.)
+  - the dashcam Wi-Fi
+  - an upload network (home Wi-Fi, hotspot, etc.)
 
 Python dependencies are listed in `requirements.txt`:
 - `requests`
@@ -52,7 +52,7 @@ sudo nano /etc/dashcam-crawler.conf
 
 Minimum required values:
 
-- `CAMERA_SSID`: SSID of your dashcam Wi‑Fi.
+- `CAMERA_SSID`: SSID of your dashcam Wi-Fi.
 - `TARGET`: upload destination URL (see below).
 
 Useful optional values:
@@ -118,10 +118,10 @@ Uninstall:
 make uninstall
 ```
 
-## Wi‑Fi prioritization example
+## Wi-Fi prioritization example
 
 See `./wpa_supplicant.conf.example` for an example where:
-- camera Wi‑Fi has higher priority
+- camera Wi-Fi has higher priority
 - home/hotspot networks are fallback upload networks
 
 ## Data written by the crawler
