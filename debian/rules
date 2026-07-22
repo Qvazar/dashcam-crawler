@@ -25,6 +25,11 @@ override_dh_auto_install:
 		--no-compile \
 		--quiet
 
+	# Install a wrapper in /usr/bin that dynamically discovers the correct
+	# site-packages path at runtime — avoids hardcoding the Python minor version.
+	install -d $(DESTDIR)/usr/bin
+	install -m 755 debian/dashcam-crawler.wrapper $(DESTDIR)/usr/bin/dashcam-crawler
+
 	# Install the example configuration file (treated as a conffile by
 	# dh_installdeb because it lands under /etc).
 	install -d $(DESTDIR)/etc

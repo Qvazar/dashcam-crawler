@@ -10,9 +10,8 @@ EnvironmentFile=/etc/dashcam-crawler.conf
 Type=exec
 User=dashcam-crawler
 WorkingDirectory=/var/lib/dashcam-crawler
-Environment="PYTHONPATH=/opt/dashcam-crawler/lib/python3.13/site-packages"
 Environment="PYTHONDONTWRITEBYTECODE=1"
-ExecStart=/opt/dashcam-crawler/bin/dashcam-crawler
+ExecStart=/usr/bin/dashcam-crawler
 Restart=always
 RestartSec=15
 KillSignal=SIGTERM
