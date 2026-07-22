@@ -11,7 +11,7 @@ CONFIG_FILE := /etc/dashcam-crawler.conf
 USER         := dashcam-crawler
 DATA_DIR     := /var/dashcam-crawler
 PYTHON       := $(shell command -v python3)
-DEPS         := wireless-tools iproute2 sqlite3 python3 python3-pip python3-venv
+DEPS         := wireless-tools iproute2 sqlite3 python3 python3-pip python3-venv gettext
 
 .PHONY: install uninstall check-deps venv
 
@@ -29,6 +29,8 @@ install: check-deps venv
 	fi
 	if [ ! -f "$(CONFIG_FILE)" ]; then \
 		sudo install -m 644 "$(PROJECT_ROOT)/dashcam-crawler.conf" "$(CONFIG_FILE)"; \
+	else \
+		echo "### Existing config found at $(CONFIG_FILE); keeping current file."; \
 	fi
 
 	@echo "### Setting up systemd service..."
@@ -36,6 +38,10 @@ install: check-deps venv
 	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
 	if [ ! -f "$(PROJECT_ROOT)/$(SERVICE_NAME)" ]; then \
 		echo "Error: Missing service template $(PROJECT_ROOT)/$(SERVICE_NAME)"; \
+		exit 1; \
+	fi
+	if ! command -v envsubst >/dev/null 2>&1; then \
+		echo "Error: envsubst is required. Please install gettext."; \
 		exit 1; \
 	fi
 	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" \
@@ -83,10 +89,6 @@ check-deps:
 
 venv:
 	@echo "### Setting up virtual environment and installing Python dependencies..."
-	if [ -z "$(PYTHON)" ]; then \
-		echo "Error: python3 is not installed or not in PATH."; \
-		exit 1; \
-	fi
 	if [ ! -d "$(VENV_DIR)" ]; then \
 		"$(PYTHON)" -m venv "$(VENV_DIR)"; \
 	fi
