@@ -7,6 +7,7 @@ VENV_DIR     := $(PROJECT_ROOT)/.venv
 SERVICE_NAME := dashcam-crawler.service
 SERVICE_DIR  := /etc/systemd/system
 SERVICE_FILE := $(SERVICE_DIR)/$(SERVICE_NAME)
+CONFIG_FILE := /etc/dashcam-crawler.conf
 USER         := dashcam-crawler
 DATA_DIR     := /var/dashcam-crawler
 PYTHON       := $(shell command -v python3)
@@ -21,8 +22,8 @@ install: check-deps venv
 	sudo install -d -m 755 -o "$(USER)" -g "$(USER)" "$(DATA_DIR)"
 
 	@echo "### Setting up configuration..."
-	if [ ! -f "/etc/dashcam-crawler.conf" ]; then \
-		sudo install -m 644 "$(PROJECT_ROOT)/dashcam-crawler.conf" "/etc/dashcam-crawler.conf"; \
+	if [ ! -f "$(CONFIG_FILE)" ]; then \
+		sudo install -m 644 "$(PROJECT_ROOT)/dashcam-crawler.conf" "$(CONFIG_FILE)"; \
 	fi
 
 	@echo "### Setting up systemd service..."
@@ -36,7 +37,7 @@ install: check-deps venv
 
 	@echo "### Installation complete."
 	@echo "The service '$(SERVICE_NAME)' has been started and enabled."
-	@echo "Configuration file is located at /etc/dashcam-crawler.conf. Please edit it as needed and restart the service with: systemctl restart $(SERVICE_NAME)"
+	@echo "Configuration file is located at $(CONFIG_FILE). Please edit it as needed and restart the service with: systemctl restart $(SERVICE_NAME)"
 	@echo "Logs can be viewed using: journalctl -u $(SERVICE_NAME) -f"
 
 uninstall:
@@ -45,8 +46,7 @@ uninstall:
 	sudo rm -f "$(SERVICE_FILE)"
 	sudo systemctl daemon-reload
 
-	@echo "### Removing configuration..."
-	sudo rm -f "/etc/dashcam-crawler.conf"
+	@echo "### Keeping configuration file at $(CONFIG_FILE)"
 
 	@echo "### Removing user and data directory..."
 	# userdel may fail if the user doesn't exist or has running processes; errors are ignored.
@@ -67,9 +67,9 @@ check-deps:
 		fi; \
 	done; \
 	if [ -n "$$missing" ]; then \
-		echo "Error: The following dependencies are missing:$$missing"; \
-		echo "Please install them using your package manager (e.g., apt-get install$$missing)."; \
-		exit 1; \
+		echo "### Installing missing dependencies:$$missing"; \
+		sudo apt-get update; \
+		sudo apt-get install -y $$missing; \
 	fi
 
 venv:
