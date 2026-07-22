@@ -90,15 +90,15 @@ def download_videos_from_source(video_register, source, video_recording_window=0
 
 @debug.timed
 def upload_to_destination(video_register:VideoRegister, destination):
-    videos = video_register.find_downloaded_videos()
-    first_video = next(videos, None)
-
-    if first_video is None:
-        logger.info("No downloaded videos to upload.")
-        return
-
     try:
-        logger.info("Uploading downloaded videos to destination.")
+        videos = video_register.find_downloaded_videos()
+        first_video = next(videos, None)
+
+        if first_video is None:
+            logger.debug("No downloaded videos to upload.")
+            return
+
+        logger.debug("Uploading downloaded videos to destination.")
         with destination: 
             for v in chain([first_video], videos):
                 try:
