@@ -1,3 +1,7 @@
+# NOTE: This Makefile targets Debian/Ubuntu systems (uses dpkg for dependency
+#       checks and apt-compatible package names). Adjust DEPS and check-deps
+#       for other distributions.
+
 PROJECT_ROOT := $(shell pwd)
 VENV_DIR     := $(PROJECT_ROOT)/.venv
 SERVICE_NAME := dashcam-crawler.service
@@ -12,6 +16,7 @@ DEPS         := wireless-tools iproute2 sqlite3 python3 python3-pip python3-venv
 
 install: check-deps venv
 	@echo "### Setting up user and directories..."
+	# Exit code 9 means the user already exists, which is acceptable.
 	sudo useradd -d "$(DATA_DIR)" -m "$(USER)" 2>/dev/null || true
 	sudo install -d -m 755 -o "$(USER)" -g "$(USER)" "$(DATA_DIR)"
 
@@ -21,6 +26,7 @@ install: check-deps venv
 	fi
 
 	@echo "### Setting up systemd service..."
+	# Disable any running instance before overwriting; errors are ignored if not installed yet.
 	sudo systemctl disable --now "$(SERVICE_NAME)" 2>/dev/null || true
 	PROJECT_ROOT="$(PROJECT_ROOT)" VENV_DIR="$(VENV_DIR)" USER="$(USER)" DATA_DIR="$(DATA_DIR)" \
 		envsubst < "$(PROJECT_ROOT)/$(SERVICE_NAME)" | sudo tee "$(SERVICE_FILE)" >/dev/null
@@ -43,6 +49,7 @@ uninstall:
 	sudo rm -f "/etc/dashcam-crawler.conf"
 
 	@echo "### Removing user and data directory..."
+	# userdel may fail if the user doesn't exist or has running processes; errors are ignored.
 	sudo userdel -r "$(USER)" 2>/dev/null || true
 	sudo rm -rf "$(DATA_DIR)"
 
