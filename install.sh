@@ -12,7 +12,7 @@
 set -euo pipefail
 
 # Allow overriding the image for testing or pinned deployments:
-#   DASHCAM_IMAGE=ghcr.io/qvazar/dashcam-crawler:v1.2.3 sudo bash install.sh
+#   sudo DASHCAM_IMAGE=ghcr.io/qvazar/dashcam-crawler:v1.2.3 bash install.sh
 IMAGE="${DASHCAM_IMAGE:-ghcr.io/qvazar/dashcam-crawler:latest}"
 
 SERVICE_NAME="dashcam-crawler"
@@ -75,7 +75,7 @@ setup_volume() {
 setup_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         info "Config already exists at $CONFIG_FILE — keeping existing file."
-        info "Edit it manually and run: systemctl restart $SERVICE_NAME"
+        info "Edit it manually and run: sudo systemctl restart $SERVICE_NAME"
         local target_from_config
         target_from_config=$(grep -E '^TARGET=' "$CONFIG_FILE" | cut -d= -f2- || true)
 
@@ -186,7 +186,7 @@ Volume=$DATA_VOLUME:/app/data
 AutoUpdate=registry
 EOF
         if [[ -n "$GCS_HOST_PATH" ]]; then
-            echo "Volume=$GCS_HOST_PATH:/etc/google-serviceaccount.json:ro,z"
+            echo "Volume=$GCS_HOST_PATH:/etc/google-serviceaccount.json:ro"
         fi
         cat <<'EOF'
 

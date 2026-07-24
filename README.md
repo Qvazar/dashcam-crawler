@@ -85,7 +85,7 @@ systemctl restart dashcam-crawler
 systemctl disable --now dashcam-crawler
 sudo rm /etc/containers/systemd/dashcam-crawler.container
 sudo systemctl daemon-reload
-podman volume rm dashcam-crawler-data
+sudo podman volume rm dashcam-crawler-data
 ```
 
 > Note: `podman-auto-update.timer` is global for Podman-managed containers. This uninstall flow leaves it enabled to avoid impacting unrelated services on the same host. If this was your only Podman-managed service, you can disable it manually with `systemctl disable --now podman-auto-update.timer`.
