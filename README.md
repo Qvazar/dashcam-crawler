@@ -108,6 +108,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json
 ```
 
 in `/etc/dashcam-crawler.conf` (this is the path *inside* the container, which is where the installer mounts the file).
+The installer also stores the host path in `GOOGLE_APPLICATION_CREDENTIALS_HOST` so re-runs keep the correct volume mount.
 
 ## Automatic restart and recovery behavior
 
@@ -116,6 +117,7 @@ The installed service is configured for unattended operation:
 - `Restart=always`: always restart if the crawler exits.
 - `RestartSec=15`: wait 15 seconds between restart attempts.
 - `StartLimitBurst=10` and `StartLimitIntervalSec=120`: if too many restarts happen quickly, systemd considers it unstable.
+- when the start limit is hit, systemd leaves the unit in a failed state until manually restarted (`systemctl restart dashcam-crawler`).
 - `KillSignal=SIGTERM` and `TimeoutStopSec=30`: graceful shutdown is attempted before forced termination.
 
 ## Raspberry Pi Wi-Fi setup with `nmcli`
@@ -186,6 +188,9 @@ The service persists runtime data in the named Podman volume `dashcam-crawler-da
 
 - `GOOGLE_APPLICATION_CREDENTIALS`  
   Path to a Google service account JSON key. Needed for `gs://` targets.
+
+- `GOOGLE_APPLICATION_CREDENTIALS_HOST`  
+  Host filesystem path to the same Google service account JSON key. Used by `install.sh` to mount the credentials file into the container on re-runs.
 
 - `HEARTBEAT_INTERVAL` (default: `60`)  
   Main loop sleep interval in seconds. Lower values react faster to network changes; higher values reduce activity.

@@ -76,9 +76,17 @@ setup_config() {
     if [[ -f "$CONFIG_FILE" ]]; then
         info "Config already exists at $CONFIG_FILE — keeping existing file."
         info "Edit it manually and run: systemctl restart $SERVICE_NAME"
-        # Read GCS path so write_quadlet can add the volume mount.
-        GCS_HOST_PATH=$(grep -E '^GOOGLE_APPLICATION_CREDENTIALS=' "$CONFIG_FILE" \
+        local target_from_config
+        target_from_config=$(grep -E '^TARGET=' "$CONFIG_FILE" | cut -d= -f2- || true)
+
+        # Read GCS host path for Quadlet volume mount.
+        GCS_HOST_PATH=$(grep -E '^GOOGLE_APPLICATION_CREDENTIALS_HOST=' "$CONFIG_FILE" \
             | cut -d= -f2- || true)
+        if [[ "$target_from_config" == gs://* ]] && [[ -z "$GCS_HOST_PATH" ]]; then
+            warn "Existing config has a GCS target but no GOOGLE_APPLICATION_CREDENTIALS_HOST entry."
+            GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/dashcam-crawler/google-serviceaccount.json")
+            echo "GOOGLE_APPLICATION_CREDENTIALS_HOST=$GCS_HOST_PATH" >> "$CONFIG_FILE"
+        fi
         return
     fi
 
@@ -114,7 +122,7 @@ setup_config() {
         echo ""
         echo "  A Google Cloud Storage target requires a service account JSON key."
         echo "  Provide the path to that file on this device."
-        GCS_HOST_PATH=$(ask "Path to GCS credentials file" "/root/google-serviceaccount.json")
+        GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/dashcam-crawler/google-serviceaccount.json")
         # The container always mounts the file to /etc/google-serviceaccount.json.
         gcs_creds_line="GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json"
         if [[ ! -f "$GCS_HOST_PATH" ]]; then
@@ -140,6 +148,7 @@ setup_config() {
     {
         echo "CAMERA_SSID=$camera_ssid"
         [[ -n "$target" ]]           && echo "TARGET=$target"
+        [[ -n "$GCS_HOST_PATH" ]]    && echo "GOOGLE_APPLICATION_CREDENTIALS_HOST=$GCS_HOST_PATH"
         [[ -n "$gcs_creds_line" ]]   && echo "$gcs_creds_line"
         echo "HEARTBEAT_INTERVAL=$heartbeat"
         echo "VIDEO_RECORDING_WINDOW=$rec_window"
