@@ -16,15 +16,10 @@ RUN grep -vE '^[[:space:]]*pytest' requirements.txt \
     && rm requirements.txt
 
 COPY crawler/ crawler/
-
-RUN useradd -r -u 1000 -d /app/data -s /usr/sbin/nologin dashcam-crawler \
-    && mkdir -p /app/data \
-    && chown dashcam-crawler:dashcam-crawler /app/data
+RUN mkdir -p /app/data
 
 ENV PYTHONPATH=/app
 
 WORKDIR /app/data
-
-USER dashcam-crawler
 
 CMD ["python3", "-m", "crawler.main"]

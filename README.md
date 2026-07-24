@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install
 
 The installer will:
 - install `podman` if it is not already present
-- create system user `dashcam-crawler` and data directory `/var/dashcam-crawler`
+- create a persistent Podman volume `dashcam-crawler-data` for SQLite and downloaded video cache
 - interactively prompt for all required and optional configuration values and write `/etc/dashcam-crawler.conf`
 - install and enable the systemd Quadlet unit (`/etc/containers/systemd/dashcam-crawler.container`)
 - pull the container image from GHCR
@@ -86,8 +86,7 @@ systemctl disable --now dashcam-crawler
 systemctl disable --now podman-auto-update.timer
 sudo rm /etc/containers/systemd/dashcam-crawler.container
 sudo systemctl daemon-reload
-sudo userdel -r dashcam-crawler
-sudo rm -rf /var/dashcam-crawler
+podman volume rm dashcam-crawler-data
 ```
 
 `/etc/dashcam-crawler.conf` is left in place so you can re-install without losing your configuration.
@@ -116,7 +115,6 @@ The installed service is configured for unattended operation:
 - `Restart=always`: always restart if the crawler exits.
 - `RestartSec=15`: wait 15 seconds between restart attempts.
 - `StartLimitBurst=10` and `StartLimitIntervalSec=120`: if too many restarts happen quickly, systemd considers it unstable.
-- `StartLimitAction=reboot`: when the start limit is hit, system reboots to recover.
 - `KillSignal=SIGTERM` and `TimeoutStopSec=30`: graceful shutdown is attempted before forced termination.
 
 ## Raspberry Pi Wi-Fi setup with `nmcli`
@@ -164,10 +162,10 @@ nmcli connection up home
 
 ## Data written by the crawler
 
-The service runs as user `dashcam-crawler` with working directory `/var/dashcam-crawler`:
+The service persists runtime data in the named Podman volume `dashcam-crawler-data`, mounted at `/app/data` inside the container:
 
-- SQLite DB: `/var/dashcam-crawler/videos.db`
-- Downloaded videos (staged before upload): `/var/dashcam-crawler/videos/`
+- SQLite DB: `/app/data/videos.db`
+- Downloaded videos (staged before upload): `/app/data/videos/`
 
 ## Configuration reference
 

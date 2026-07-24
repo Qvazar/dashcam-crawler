@@ -17,9 +17,8 @@ IMAGE="${DASHCAM_IMAGE:-ghcr.io/qvazar/dashcam-crawler:latest}"
 
 SERVICE_NAME="dashcam-crawler"
 CONFIG_FILE="/etc/dashcam-crawler.conf"
-DATA_DIR="/var/dashcam-crawler"
+DATA_VOLUME="dashcam-crawler-data"
 QUADLET_DIR="/etc/containers/systemd"
-SERVICE_USER="dashcam-crawler"
 
 # Set by setup_config; used by write_quadlet to add a GCS volume mount.
 GCS_HOST_PATH=""
@@ -60,15 +59,15 @@ install_podman() {
     apt-get install -y --no-install-recommends podman
 }
 
-# ── System user and data directory ───────────────────────────────────────────
+# ── Persistent volume ─────────────────────────────────────────────────────────
 
-setup_user_and_dirs() {
-    if ! id "$SERVICE_USER" &>/dev/null; then
-        info "Creating system user '$SERVICE_USER'..."
-        useradd -r -m -d "$DATA_DIR" -s /usr/sbin/nologin "$SERVICE_USER"
+setup_volume() {
+    if podman volume exists "$DATA_VOLUME"; then
+        info "Podman volume already exists: $DATA_VOLUME"
+        return
     fi
-    install -d -m 755 -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR"
-    info "Data directory: $DATA_DIR"
+    info "Creating Podman volume: $DATA_VOLUME"
+    podman volume create "$DATA_VOLUME" >/dev/null
 }
 
 # ── Configuration setup ───────────────────────────────────────────────────────
@@ -170,7 +169,7 @@ StartLimitIntervalSec=120
 Image=$IMAGE
 Network=host
 EnvironmentFile=$CONFIG_FILE
-Volume=$DATA_DIR:/app/data:z
+Volume=$DATA_VOLUME:/app/data
 AutoUpdate=registry
 EOF
         if [[ -n "$GCS_HOST_PATH" ]]; then
@@ -222,7 +221,7 @@ start_service() {
 main() {
     check_root
     install_podman
-    setup_user_and_dirs
+    setup_volume
     setup_config
     write_quadlet
     pull_image
@@ -237,6 +236,7 @@ main() {
     echo "  Status:      systemctl status $SERVICE_NAME"
     echo "  Logs:        journalctl -u $SERVICE_NAME -f"
     echo "  Config:      sudo nano $CONFIG_FILE"
+    echo "  Data volume: podman volume inspect $DATA_VOLUME"
     echo "  Restart:     systemctl restart $SERVICE_NAME"
     echo ""
     echo "  Auto-updates are enabled via podman-auto-update.timer (runs daily)."
