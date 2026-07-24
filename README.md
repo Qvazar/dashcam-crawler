@@ -20,63 +20,73 @@ The crawler loop:
 
 ## Requirements
 
-- Debian/Ubuntu-based Linux system (the Makefile uses `dpkg`/`apt`).
-- `sudo` access (required for service install/uninstall).
+- Debian Trixie (or later) — the installer uses `apt` and the Trixie repos for `podman`.
+- `sudo` / root access.
 - Network setup that can connect to both:
   - the dashcam Wi-Fi
   - an upload network (home Wi-Fi, hotspot, etc.)
 
-Python dependencies are installed automatically by `make install` from `requirements.txt`.
+The service runs as a [Podman](https://podman.io/) container managed by systemd via a [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) unit.
 
-## Installation and lifecycle (make + systemd)
+## Installation
 
-### 1) Install and start the service
+### 1) Download and run the installer
 
 ```bash
-cd /path/to/dashcam-crawler
-make install
+curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install.sh | sudo bash
 ```
 
-`make install` will:
-- install missing system dependencies
-- create a local virtual environment and install Python dependencies
-- create system user `dashcam-crawler`
-- create `/var/dashcam-crawler`
-- install `/etc/dashcam-crawler.conf` if missing
-- render and install `dashcam-crawler.service`
-- enable and start the systemd service
+Or clone the repo and run locally:
 
-### 2) Edit configuration
+```bash
+sudo bash install.sh
+```
 
-After installation, edit the runtime config:
+The installer will:
+- install `podman` if it is not already present
+- create system user `dashcam-crawler` and data directory `/var/dashcam-crawler`
+- interactively prompt for all required and optional configuration values and write `/etc/dashcam-crawler.conf`
+- install and enable the systemd Quadlet unit (`/etc/containers/systemd/dashcam-crawler.container`)
+- pull the container image from GHCR
+- enable `podman-auto-update.timer` so the image is kept up to date automatically (daily)
+- start the service
+
+### 2) Edit configuration (if needed after installation)
 
 ```bash
 sudo nano /etc/dashcam-crawler.conf
+sudo systemctl restart dashcam-crawler
 ```
-
-Required values:
-
-- `CAMERA_SSID`: SSID of your dashcam Wi-Fi.
-- `TARGET`: upload destination URL (see below).
-
-Changes to `/etc/dashcam-crawler.conf` are applied automatically because the service restarts when the config file is updated.
 
 ### 3) Service operations
 
 ```bash
-sudo systemctl status dashcam-crawler.service
-sudo journalctl -u dashcam-crawler.service -f
+systemctl status dashcam-crawler
+journalctl -u dashcam-crawler -f
 ```
 
-### 4) Uninstall
+### 4) Manual update
+
+The container image is updated automatically every day via `podman-auto-update.timer`.  
+To update immediately:
 
 ```bash
-cd /path/to/dashcam-crawler
-make uninstall
+podman pull ghcr.io/qvazar/dashcam-crawler:latest
+systemctl restart dashcam-crawler
 ```
 
-`make uninstall` stops/disables the service and removes service/user/data/venv resources.  
-It keeps `/etc/dashcam-crawler.conf` in place.
+### 5) Uninstall
+
+```bash
+systemctl disable --now dashcam-crawler
+systemctl disable --now podman-auto-update.timer
+sudo rm /etc/containers/systemd/dashcam-crawler.container
+sudo systemctl daemon-reload
+sudo userdel -r dashcam-crawler
+sudo rm -rf /var/dashcam-crawler
+```
+
+`/etc/dashcam-crawler.conf` is left in place so you can re-install without losing your configuration.
 
 ## Upload targets
 
@@ -87,13 +97,13 @@ It keeps `/etc/dashcam-crawler.conf` in place.
 
 ### Google Cloud Storage authentication
 
-Set:
+The installer will ask for the path to your service account JSON key on the host device and mount it into the container automatically.  Set:
 
 ```bash
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json
 ```
 
-in your config file so the Google client can authenticate.
+in `/etc/dashcam-crawler.conf` (this is the path *inside* the container, which is where the installer mounts the file).
 
 ## Automatic restart and recovery behavior
 
@@ -150,11 +160,10 @@ nmcli connection up home
 
 ## Data written by the crawler
 
-By default (working directory dependent):
-- SQLite DB: `./videos.db`
-- Downloaded videos: `./videos/`
+The service runs as user `dashcam-crawler` with working directory `/var/dashcam-crawler`:
 
-When installed via `make install`, the service runs as user `dashcam-crawler` with working directory `/var/dashcam-crawler`.
+- SQLite DB: `/var/dashcam-crawler/videos.db`
+- Downloaded videos (staged before upload): `/var/dashcam-crawler/videos/`
 
 ## Configuration reference
 
