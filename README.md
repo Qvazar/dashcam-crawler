@@ -20,7 +20,7 @@ The crawler loop:
 
 ## Requirements
 
-- Debian Trixie (or later) — the installer uses `apt` and the Trixie repos for `podman`.
+- Debian-based Linux with `apt` and Podman packages available (tested on Debian Trixie).
 - `sudo` / root access.
 - Network setup that can connect to both:
   - the dashcam Wi-Fi
@@ -83,11 +83,12 @@ systemctl restart dashcam-crawler
 
 ```bash
 systemctl disable --now dashcam-crawler
-systemctl disable --now podman-auto-update.timer
 sudo rm /etc/containers/systemd/dashcam-crawler.container
 sudo systemctl daemon-reload
 podman volume rm dashcam-crawler-data
 ```
+
+> Note: `podman-auto-update.timer` is global for Podman-managed containers. This uninstall flow leaves it enabled to avoid impacting unrelated services on the same host.
 
 `/etc/dashcam-crawler.conf` is left in place so you can re-install without losing your configuration.
 

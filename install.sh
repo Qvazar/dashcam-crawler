@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Dashcam Crawler — Container Installation Script
 #
 # Usage:
@@ -114,7 +114,7 @@ setup_config() {
         echo ""
         echo "  A Google Cloud Storage target requires a service account JSON key."
         echo "  Provide the path to that file on this device."
-        GCS_HOST_PATH=$(ask "Path to GCS credentials file" "/etc/google-serviceaccount.json")
+        GCS_HOST_PATH=$(ask "Path to GCS credentials file" "/root/google-serviceaccount.json")
         # The container always mounts the file to /etc/google-serviceaccount.json.
         gcs_creds_line="GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json"
         if [[ ! -f "$GCS_HOST_PATH" ]]; then

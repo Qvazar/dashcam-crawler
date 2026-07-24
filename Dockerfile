@@ -11,6 +11,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt .
+# Exclude pytest from the runtime image; it's only needed for development/testing.
 RUN grep -vE '^[[:space:]]*pytest' requirements.txt \
     | pip3 install --no-cache-dir --break-system-packages -r /dev/stdin \
     && rm requirements.txt
