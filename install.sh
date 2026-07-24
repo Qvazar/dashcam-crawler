@@ -85,6 +85,10 @@ setup_config() {
         if [[ "$target_from_config" == gs://* ]] && [[ -z "$GCS_HOST_PATH" ]]; then
             warn "Existing config has a GCS target but no GOOGLE_APPLICATION_CREDENTIALS_HOST entry."
             GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/dashcam-crawler/google-serviceaccount.json")
+            if [[ ! -f "$GCS_HOST_PATH" ]]; then
+                warn "File not found at $GCS_HOST_PATH"
+                warn "Update this path or copy the credentials file there before starting the service."
+            fi
             echo "GOOGLE_APPLICATION_CREDENTIALS_HOST=$GCS_HOST_PATH" >> "$CONFIG_FILE"
         fi
         return
