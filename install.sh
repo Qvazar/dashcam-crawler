@@ -86,8 +86,7 @@ setup_config() {
             warn "Existing config has a GCS target but no GOOGLE_APPLICATION_CREDENTIALS_HOST entry."
             GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/dashcam-crawler/google-serviceaccount.json")
             if [[ ! -f "$GCS_HOST_PATH" ]]; then
-                warn "File not found at $GCS_HOST_PATH"
-                warn "Update this path or copy the credentials file there before starting the service."
+                die "GCS credentials file not found at $GCS_HOST_PATH. Copy your service account JSON there and re-run the installer."
             fi
             echo "GOOGLE_APPLICATION_CREDENTIALS_HOST=$GCS_HOST_PATH" >> "$CONFIG_FILE"
         fi
@@ -130,9 +129,8 @@ setup_config() {
         # The container always mounts the file to /etc/google-serviceaccount.json.
         gcs_creds_line="GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json"
         if [[ ! -f "$GCS_HOST_PATH" ]]; then
-            warn "File not found at $GCS_HOST_PATH"
-            warn "Copy your service account JSON there before starting the service."
-        fi
+                die "GCS credentials file not found at $GCS_HOST_PATH. Copy your service account JSON there and re-run the installer."
+            fi
     fi
 
     # ── Optional settings ─────────────────────────────────────────────────────
@@ -152,7 +150,7 @@ setup_config() {
     {
         echo "CAMERA_SSID=$camera_ssid"
         [[ -n "$target" ]]           && echo "TARGET=$target"
-        [[ -n "$GCS_HOST_PATH" ]]    && echo "GOOGLE_APPLICATION_CREDENTIALS_HOST=$GCS_HOST_PATH"
+        [[ -n "$GCS_HOST_PATH" ]]    && echo "# Used by install.sh to mount credentials on re-runs; not used by the crawler itself." && echo "GOOGLE_APPLICATION_CREDENTIALS_HOST=$GCS_HOST_PATH"
         [[ -n "$gcs_creds_line" ]]   && echo "$gcs_creds_line"
         echo "HEARTBEAT_INTERVAL=$heartbeat"
         echo "VIDEO_RECORDING_WINDOW=$rec_window"

@@ -101,7 +101,7 @@ sudo podman volume rm dashcam-crawler-data
 
 ### Google Cloud Storage authentication
 
-The installer will ask for the path to your service account JSON key on the host device and mount it into the container automatically.  Set:
+The installer will ask for the path to your service account JSON key on the host device and mount it into the container automatically. Set:
 
 ```bash
 GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json
