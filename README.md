@@ -32,14 +32,18 @@ The service runs as a [Podman](https://podman.io/) container managed by systemd 
 
 ### 1) Download and run the installer
 
+Before running, review the script:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install.sh -o install.sh
+less install.sh          # inspect before running
+sudo bash install.sh
 ```
 
-Or clone the repo and run locally:
+Or, if you already trust the script:
 
 ```bash
-sudo bash install.sh
+curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install.sh | sudo bash
 ```
 
 The installer will:

@@ -65,7 +65,7 @@ install_podman() {
 setup_user_and_dirs() {
     if ! id "$SERVICE_USER" &>/dev/null; then
         info "Creating system user '$SERVICE_USER'..."
-        useradd -r -d "$DATA_DIR" -s /usr/sbin/nologin "$SERVICE_USER"
+        useradd -r -m -d "$DATA_DIR" -s /usr/sbin/nologin "$SERVICE_USER"
     fi
     install -d -m 755 -o "$SERVICE_USER" -g "$SERVICE_USER" "$DATA_DIR"
     info "Data directory: $DATA_DIR"
@@ -79,7 +79,7 @@ setup_config() {
         info "Edit it manually and run: systemctl restart $SERVICE_NAME"
         # Read GCS path so write_quadlet can add the volume mount.
         GCS_HOST_PATH=$(grep -E '^GOOGLE_APPLICATION_CREDENTIALS=' "$CONFIG_FILE" \
-            | cut -d= -f2- | tr -d '"' || true)
+            | cut -d= -f2- || true)
         return
     fi
 
@@ -165,7 +165,6 @@ Description=Dashcam Crawler
 After=network.target
 StartLimitBurst=10
 StartLimitIntervalSec=120
-StartLimitAction=reboot
 
 [Container]
 Image=$IMAGE
@@ -210,7 +209,7 @@ enable_auto_update() {
 start_service() {
     if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
         info "Stopping existing $SERVICE_NAME instance..."
-        systemctl stop "$SERVICE_NAME" || true
+        systemctl stop "$SERVICE_NAME"
     fi
     info "Reloading systemd daemon..."
     systemctl daemon-reload

@@ -11,7 +11,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY requirements.txt .
-RUN grep -v '^\s*pytest' requirements.txt \
+RUN grep -vE '^[[:space:]]*pytest' requirements.txt \
     | pip3 install --no-cache-dir --break-system-packages -r /dev/stdin \
     && rm requirements.txt
 
