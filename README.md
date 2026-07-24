@@ -117,7 +117,7 @@ The installed service is configured for unattended operation:
 - `Restart=always`: always restart if the crawler exits.
 - `RestartSec=15`: wait 15 seconds between restart attempts.
 - `StartLimitBurst=10` and `StartLimitIntervalSec=120`: if too many restarts happen quickly, systemd considers it unstable.
-- when the start limit is hit, systemd leaves the unit in a failed state until manually restarted (`systemctl restart dashcam-crawler`).
+- when the start limit is hit, systemd leaves the unit in a failed state until manually restarted (`systemctl restart dashcam-crawler`). No `StartLimitAction` is set, so the default systemd behavior applies — the unit enters a failed state rather than triggering a reboot.
 - `KillSignal=SIGTERM` and `TimeoutStopSec=30`: graceful shutdown is attempted before forced termination.
 
 ## Raspberry Pi Wi-Fi setup with `nmcli`
