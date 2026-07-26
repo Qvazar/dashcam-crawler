@@ -1,6 +1,10 @@
 import os
 from google.cloud import storage
 
+from crawler.videorecord import VideoRecord
+
+__CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
+
 
 class GoogleCloudStorage:
     @staticmethod
@@ -17,11 +21,21 @@ class GoogleCloudStorage:
         self.bucket = self.client.bucket(self.bucket_name)
         return self
 
-    def put(self, file_path, destination_path, marked: bool = False):
-        blob = self.bucket.blob(os.path.join(self.prefix, destination_path) if self.prefix else destination_path)
-        if marked:
-            blob.metadata = {"marked": "true"}
-        blob.upload_from_filename(file_path)
+    def put(self, file_path, video: VideoRecord):
+        destination_path = video.filename
+        
+        blob = self.bucket.blob(os.path.join(self.prefix, destination_path) if self.prefix else destination_path, chunk_size=__CHUNK_SIZE)
+
+        metadata = {
+            "Content-Type": "video/mpeg",
+            "Custom-Time": video.recorded_at.isoformat(timespec="seconds")
+            }
+
+        if video.marked:
+            metadata["marked"] = "true"
+
+        blob.metadata = metadata
+        blob.upload_from_filename(file_path, timeout=10)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.client.close()

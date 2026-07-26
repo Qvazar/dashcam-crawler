@@ -2,6 +2,8 @@ from urllib.parse import urlsplit
 import paramiko
 import os
 
+from crawler.videorecord import VideoRecord
+
 class Sftp:
     @staticmethod
     def supports_url(url):
@@ -26,10 +28,13 @@ class Sftp:
         
         return self
 
-    def put(self, file_path, destination_path, marked: bool = False):
-        if marked:
+    def put(self, file_path, video: VideoRecord):
+        destination_path = video.filename
+
+        if video.marked:
             base, ext = os.path.splitext(destination_path)
             destination_path = f"{base}_marked{ext}"
+            
         self.sftp.put(file_path, destination_path)
 
     def __exit__(self, exc_type, exc_val, exc_tb):
