@@ -1,15 +1,6 @@
-FROM debian:trixie-slim
+FROM python:3-alpine
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        libffi-dev \
-        python3 \
-        python3-dev \
-        python3-pip \
-        wireless-tools \
-        iproute2 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache wireless-tools iproute2
 
 WORKDIR /app
 
