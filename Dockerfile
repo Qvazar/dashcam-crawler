@@ -1,6 +1,6 @@
 FROM python:3-alpine
 
-RUN apk add --no-cache wireless-tools iproute2
+RUN apk add --no-cache libffi-dev gcc musl-dev wireless-tools iproute2
 
 WORKDIR /app
 
