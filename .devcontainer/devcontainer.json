@@ -1,5 +1,5 @@
 {
-  "name": "fitcamx-crawler-dev",
+  "name": "dashcam-crawler-dev",
   "build": {
     "dockerfile": "Dockerfile",
     "context": ".."
@@ -7,7 +7,7 @@
   "customizations": {
     "vscode": {
       "settings": {
-        "python.defaultInterpreterPath": "/workspaces/fitcamx-crawler/.venv/bin/python3"
+        "python.defaultInterpreterPath": "/workspaces/dashcam-crawler/.venv/bin/python3"
       },
       "extensions": [
         "ms-python.python",

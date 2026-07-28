@@ -84,7 +84,7 @@ setup_config() {
             | cut -d= -f2- || true)
         if [[ "$target_from_config" == gs://* ]] && [[ -z "$GCS_HOST_PATH" ]]; then
             warn "Existing config has a GCS target but no GOOGLE_APPLICATION_CREDENTIALS_HOST entry."
-            GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/dashcam-crawler/google-serviceaccount.json")
+            GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/google-serviceaccount.json")
             if [[ ! -f "$GCS_HOST_PATH" ]]; then
                 die "GCS credentials file not found at $GCS_HOST_PATH. Copy your service account JSON there and re-run the installer."
             fi
@@ -113,7 +113,7 @@ setup_config() {
     echo "  TARGET: where to upload videos after leaving the camera network."
     echo "  Supported formats:"
     echo "    gs://bucket-name/optional/prefix   — Google Cloud Storage"
-    echo "    sftp://user@host:port/path          — SFTP"
+    echo "    sftp://user@host:port/path         — SFTP"
     echo "  Leave empty to skip uploads (you can set TARGET later)."
     local target
     target=$(ask "TARGET" "")
@@ -125,7 +125,7 @@ setup_config() {
         echo ""
         echo "  A Google Cloud Storage target requires a service account JSON key."
         echo "  Provide the path to that file on this device."
-        GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/dashcam-crawler/google-serviceaccount.json")
+        GCS_HOST_PATH=$(ask "Path to GCS credentials file on host" "/etc/google-serviceaccount.json")
         # The container always mounts the file to /etc/google-serviceaccount.json.
         gcs_creds_line="GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json"
         if [[ ! -f "$GCS_HOST_PATH" ]]; then
@@ -135,14 +135,12 @@ setup_config() {
 
     # ── Optional settings ─────────────────────────────────────────────────────
 
-    echo ""
-    echo "  Optional settings — press Enter to accept the defaults:"
     local heartbeat rec_window marked_window extensions marked_dirs
-    heartbeat=$(ask    "HEARTBEAT_INTERVAL (main loop sleep, seconds)" "60")
-    rec_window=$(ask   "VIDEO_RECORDING_WINDOW (minutes before downloading new files)" "2")
-    marked_window=$(ask "VIDEO_EXTENDED_MARKED_WINDOW (minutes around marked videos to keep)" "0")
-    extensions=$(ask   "VIDEO_EXTENSIONS (comma-separated)" ".TS,.MP4")
-    marked_dirs=$(ask  "FITCAMX_MARKED_VIDEO_DIRS (comma-separated)" "CARDV/EMR/,CARDV/EMR_E/")
+    heartbeat="60"
+    rec_window="2"
+    marked_window="0"
+    extensions=".TS,.MP4"
+    marked_dirs="CARDV/EMR/,CARDV/EMR_E/"
 
     # ── Write config ──────────────────────────────────────────────────────────
 

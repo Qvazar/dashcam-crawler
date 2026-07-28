@@ -22,6 +22,7 @@ RUN mkdir -p /app/data
 
 ENV PYTHONPATH=/app
 
+VOLUME /app/data
 WORKDIR /app/data
 
 CMD ["python3", "-m", "crawler.main"]
