@@ -1,5 +1,6 @@
 requests
 beautifulsoup4
 google-cloud-storage
+google_crc32c
 paramiko
 pytest

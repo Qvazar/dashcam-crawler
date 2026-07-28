@@ -1,3 +1,6 @@
+# example video files
+*.TS
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -73,7 +76,7 @@ docs/_build/
 
 # PyBuilder
 .pybuilder/
-#target/
+target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
