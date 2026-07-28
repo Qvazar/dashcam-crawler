@@ -1,5 +1,6 @@
 """Tests for crawler/destination/ — URL routing, Sftp, GoogleCloudStorage."""
 import os
+from datetime import datetime
 from urllib.parse import urlsplit
 from unittest.mock import MagicMock, patch, call
 
@@ -8,6 +9,7 @@ import pytest
 from crawler.destination import get_destination_from_url
 from crawler.destination.Sftp import Sftp
 from crawler.destination.GoogleCloudStorage import GoogleCloudStorage
+from crawler.videorecord import VideoRecord
 
 # A fake SFTP URL used throughout these tests. Credentials are obviously
 # non-real test values and are embedded only via urlsplit construction to
@@ -138,14 +140,21 @@ class TestGoogleCloudStorage:
         video_file = tmp_path / "video.TS"
         video_file.write_bytes(b"video data")
 
+        video = VideoRecord(
+            filename="video.TS",
+            camera_path="/tmp/video.TS",
+            status="downloaded",
+            recorded_at=datetime(2024, 1, 1, 12, 0, 0),
+        )
+
         gcs = GoogleCloudStorage("gs://my-bucket/uploads")
         with gcs:
-            gcs.put(str(video_file), "video.TS")
+            gcs.put(str(video_file), video)
 
         mock_client.bucket.return_value.blob.assert_called_once_with(
-            os.path.join("uploads", "video.TS")
+            os.path.join("uploads", "video.TS"), chunk_size=10 * 1024 * 1024
         )
-        mock_blob.upload_from_filename.assert_called_once_with(str(video_file))
+        mock_blob.upload_from_filename.assert_called_once_with(str(video_file), timeout=10)
 
     @patch("crawler.destination.GoogleCloudStorage.storage.Client")
     def test_put_uploads_blob_without_prefix(self, mock_client_cls, tmp_path):
@@ -157,9 +166,18 @@ class TestGoogleCloudStorage:
         video_file = tmp_path / "video.TS"
         video_file.write_bytes(b"video data")
 
+        video = VideoRecord(
+            filename="video.TS",
+            camera_path="/tmp/video.TS",
+            status="downloaded",
+            recorded_at=datetime(2024, 1, 1, 12, 0, 0),
+        )
+
         gcs = GoogleCloudStorage("gs://my-bucket")
         with gcs:
-            gcs.put(str(video_file), "video.TS")
+            gcs.put(str(video_file), video)
 
-        mock_client.bucket.return_value.blob.assert_called_once_with("video.TS")
-        mock_blob.upload_from_filename.assert_called_once_with(str(video_file))
+        mock_client.bucket.return_value.blob.assert_called_once_with(
+            "video.TS", chunk_size=10 * 1024 * 1024
+        )
+        mock_blob.upload_from_filename.assert_called_once_with(str(video_file), timeout=10)

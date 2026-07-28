@@ -3,7 +3,7 @@ from google.cloud import storage
 
 from crawler.videorecord import VideoRecord
 
-__CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
+_CHUNK_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 class GoogleCloudStorage:
@@ -24,7 +24,7 @@ class GoogleCloudStorage:
     def put(self, file_path, video: VideoRecord):
         destination_path = video.filename
         
-        blob = self.bucket.blob(os.path.join(self.prefix, destination_path) if self.prefix else destination_path, chunk_size=__CHUNK_SIZE)
+        blob = self.bucket.blob(os.path.join(self.prefix, destination_path) if self.prefix else destination_path, chunk_size=_CHUNK_SIZE)
 
         metadata = {
             "Content-Type": "video/mpeg",
