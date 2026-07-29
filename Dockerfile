@@ -1,14 +1,12 @@
 FROM python:3-alpine
 
-RUN apk add --no-cache libffi-dev gcc musl-dev wireless-tools iproute2
+RUN apk add --no-cache \
+        wireless-tools iproute2
 
 WORKDIR /app
 
 COPY requirements.txt .
-# --break-system-packages is appropriate here: this is a container image where
-# there is no system Python to protect, and using pip directly is simpler than
-# adding a venv layer.
-RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt \
+RUN pip3 install --no-cache-dir -r requirements.txt \
     && rm requirements.txt
 
 COPY crawler/ crawler/
