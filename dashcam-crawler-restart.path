@@ -1,9 +1,0 @@
-[Unit]
-Description=Watch Dashcam Crawler config changes
-
-[Path]
-PathChanged=${CONFIG_FILE}
-Unit=dashcam-crawler-restart.service
-
-[Install]
-WantedBy=multi-user.target

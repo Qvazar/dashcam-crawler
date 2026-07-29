@@ -26,4 +26,4 @@ RUN groupadd --gid "$USER_GID" "$USERNAME" \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
 USER $USERNAME
-WORKDIR /workspaces/fitcamx-crawler
+WORKDIR /workspaces/dashcam-crawler
