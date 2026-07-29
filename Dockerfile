@@ -1,7 +1,8 @@
 FROM python:3-alpine
 
 RUN apk add --no-cache \
-        wireless-tools iproute2
+        wireless-tools iproute2 \
+        libffi-dev rust python3-dev build-base
 
 WORKDIR /app
 
