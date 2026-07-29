@@ -1,0 +1,44 @@
+#!/bin/sh
+set -e
+
+DAEMON_USER=dashcam-crawler
+DATA_DIR=/var/lib/dashcam-crawler
+
+case "$1" in
+    configure)
+        # Create a system user for the service if it doesn't already exist.
+        if ! getent passwd "$DAEMON_USER" > /dev/null 2>&1; then
+            useradd \
+                --system \
+                --home-dir "$DATA_DIR" \
+                --no-create-home \
+                --shell /usr/sbin/nologin \
+                "$DAEMON_USER"
+        fi
+
+        # Ensure the data directory exists and is owned by the service user.
+        install -d -m 755 -o "$DAEMON_USER" -g "$DAEMON_USER" "$DATA_DIR"
+
+        # Reload systemd and enable/start both units.  Skip when running
+        # inside a container where systemd is not the init system.
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload
+            systemctl enable dashcam-crawler.service
+            systemctl enable dashcam-crawler-restart.path
+            systemctl start dashcam-crawler-restart.path || true
+            # The service will fail to start until CAMERA_SSID is configured,
+            # so we allow it to fail here without aborting the install.
+            systemctl start dashcam-crawler.service || true
+        fi
+        ;;
+    abort-upgrade|abort-deconfigure|abort-remove)
+        ;;
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

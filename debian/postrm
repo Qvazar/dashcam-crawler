@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+DAEMON_USER=dashcam-crawler
+DATA_DIR=/var/lib/dashcam-crawler
+
+case "$1" in
+    purge)
+        # On purge, remove the data directory and service user.
+        # The configuration file (/etc/dashcam-crawler.conf) is handled
+        # automatically by dpkg as a conffile.
+        rm -rf "$DATA_DIR"
+        if getent passwd "$DAEMON_USER" > /dev/null 2>&1; then
+            userdel "$DAEMON_USER"
+        fi
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+        fi
+        ;;
+    remove)
+        # On remove, reload systemd to drop the now-uninstalled units.
+        # User data is preserved so it survives reinstallation.
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+        fi
+        ;;
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+    *)
+        echo "postrm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -1,0 +1,84 @@
+name: Build and Release Debian Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Extract version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Stamp debian/changelog with tag version
+        run: |
+          sed -i "1s/dashcam-crawler ([^)]*)/dashcam-crawler ($VERSION)/" debian/changelog
+          sed -i "s/^ -- Qvazar.*/ -- Qvazar <noreply@github.com>  $(date -R)/" debian/changelog
+
+      - name: Build package inside Debian Trixie container
+        # dpkg-buildpackage writes output to the *parent* of the source tree,
+        # so we copy the source into a subdirectory of a temporary staging
+        # area and mount that area into the container.
+        run: |
+          mkdir -p /tmp/pkg dist
+
+          # Copy the workspace (with the updated changelog) into the staging dir.
+          cp -rp "$GITHUB_WORKSPACE" /tmp/pkg/dashcam-crawler
+
+          docker run --rm \
+            --volume /tmp/pkg:/tmp/pkg \
+            --volume "$GITHUB_WORKSPACE/dist:/dist" \
+            debian:trixie bash << 'DOCKER_EOF'
+          set -euo pipefail
+
+          apt-get update -qq
+          apt-get install -y -qq --no-install-recommends \
+            dpkg-dev \
+            debhelper \
+            fakeroot \
+            python3 \
+            python3-pip \
+            python3-setuptools
+
+          # ── Tests ─────────────────────────────────────────────────────────
+          python3 -m venv /tmp/test-venv
+          /tmp/test-venv/bin/pip install -r /tmp/pkg/dashcam-crawler/requirements.txt \
+            -q --no-cache-dir
+          PYTHONPATH=/tmp/pkg/dashcam-crawler \
+            /tmp/test-venv/bin/pytest /tmp/pkg/dashcam-crawler/tests/ -v
+
+          # ── Build ─────────────────────────────────────────────────────────
+          cd /tmp/pkg/dashcam-crawler
+          dpkg-buildpackage -us -uc -b
+
+          cp /tmp/pkg/dashcam-crawler_*.deb /dist/
+          DOCKER_EOF
+
+      - name: Locate built package
+        run: |
+          DEB_FILE=$(ls dist/*.deb | head -1)
+          echo "DEB_FILE=$DEB_FILE" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: ${{ env.DEB_FILE }}
+
+      - name: Create GitHub Release and attach package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "$DEB_FILE" \
+            || gh release upload "$GITHUB_REF_NAME" "$DEB_FILE" --clobber

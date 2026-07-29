@@ -1,0 +1,15 @@
+Source: dashcam-crawler
+Section: net
+Priority: optional
+Maintainer: Qvazar <noreply@github.com>
+Build-Depends: debhelper-compat (= 13), python3 (>= 3.13), python3-pip, python3-setuptools
+Standards-Version: 4.6.2
+Rules-Requires-Root: no
+
+Package: dashcam-crawler
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, python3 (>= 3.13), wireless-tools, iproute2
+Description: FitCamX dashcam Wi-Fi crawler and uploader
+ Watches for a FitCamX dashcam Wi-Fi network, crawls video files
+ from the camera, stores them locally, and uploads them to a
+ configured destination (Google Cloud Storage or SFTP).
