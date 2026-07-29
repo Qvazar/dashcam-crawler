@@ -54,6 +54,15 @@ install_podman() {
         info "Podman already installed: $(podman --version)"
         return
     fi
+
+    if [[ "$(uname -s)" != "Linux" ]]; then
+        die "Automatic Podman installation is only supported on Linux with apt. Install Podman manually, then re-run this script."
+    fi
+
+    if ! command -v apt-get &>/dev/null; then
+        die "apt-get not found. Install Podman manually for your distribution, then re-run this script."
+    fi
+    
     info "Installing podman..."
     apt-get update -qq
     apt-get install -y --no-install-recommends podman
