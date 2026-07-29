@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install
 The installer will:
 - install `podman` if it is not already present
 - create a persistent Podman volume `dashcam-crawler-data` for SQLite and downloaded video cache
-- interactively prompt for all required and optional configuration values and write `/etc/dashcam-crawler.conf`
+- interactively prompt for all required configuration values and write `/etc/dashcam-crawler.conf`
 - install and enable the systemd Quadlet unit (`/etc/containers/systemd/dashcam-crawler.container`)
 - pull the container image from GHCR
 - enable `podman-auto-update.timer` so the image is kept up to date automatically (daily)
@@ -101,14 +101,7 @@ sudo podman volume rm dashcam-crawler-data
 
 ### Google Cloud Storage authentication
 
-The installer will ask for the path to your service account JSON key on the host device and mount it into the container automatically. Set:
-
-```bash
-GOOGLE_APPLICATION_CREDENTIALS=/etc/google-serviceaccount.json
-```
-
-in `/etc/dashcam-crawler.conf` (this is the path *inside* the container, which is where the installer mounts the file).
-The installer also stores the host path in `GOOGLE_APPLICATION_CREDENTIALS_HOST` so re-runs keep the correct volume mount.
+The installer will ask for the path to your service account JSON key on the host device and mount it into the container automatically.
 
 ## Automatic restart and recovery behavior
 
@@ -118,7 +111,6 @@ The installed service is configured for unattended operation:
 - `RestartSec=15`: wait 15 seconds between restart attempts.
 - `StartLimitBurst=10` and `StartLimitIntervalSec=120`: if too many restarts happen quickly, systemd considers it unstable.
 - when the start limit is hit, systemd leaves the unit in a failed state until manually restarted (`systemctl restart dashcam-crawler`). No `StartLimitAction` is set, so the default systemd behavior applies — the unit enters a failed state rather than triggering a reboot.
-- `KillSignal=SIGTERM` and `TimeoutStopSec=30`: graceful shutdown is attempted before forced termination.
 
 ## Raspberry Pi Wi-Fi setup with `nmcli`
 
@@ -165,10 +157,10 @@ nmcli connection up home
 
 ## Data written by the crawler
 
-The service persists runtime data in the named Podman volume `dashcam-crawler-data`, mounted at `/app/data` inside the container:
+The service persists runtime data in the named Podman volume `dashcam-crawler-data`:
 
-- SQLite DB: `/app/data/videos.db`
-- Downloaded videos (staged before upload): `/app/data/videos/`
+- SQLite DB: `videos.db`
+- Downloaded videos (staged before upload) are stored in the `videos/` directory.
 
 ## Configuration reference
 
@@ -185,12 +177,6 @@ The service persists runtime data in the named Podman volume `dashcam-crawler-da
   - `sftp://user:password@host:port/path`
 
 ### Optional
-
-- `GOOGLE_APPLICATION_CREDENTIALS`  
-  Path to a Google service account JSON key. Needed for `gs://` targets.
-
-- `GOOGLE_APPLICATION_CREDENTIALS_HOST`  
-  Host filesystem path to the same Google service account JSON key. Used by `install.sh` to mount the credentials file into the container on re-runs.
 
 - `HEARTBEAT_INTERVAL` (default: `60`)  
   Main loop sleep interval in seconds. Lower values react faster to network changes; higher values reduce activity.
@@ -211,5 +197,5 @@ The service persists runtime data in the named Podman volume `dashcam-crawler-da
 
 - **No camera videos found**: verify you are connected to `CAMERA_SSID` and the camera HTTP listing is reachable.
 - **No uploads**: verify `TARGET` format and destination credentials.
-- **GCS auth errors**: verify `GOOGLE_APPLICATION_CREDENTIALS` path and service account permissions.
+- **GCS auth errors**: verify `GOOGLE_APPLICATION_CREDENTIALS` path and service account permissions. To enable resumable uploads, the service account should have Create, Read, Update and Delete permissions on the Google Storage Bucket.
 - **Service keeps restarting**: check logs with `journalctl` and confirm all required env vars are set in `/etc/dashcam-crawler.conf`.
