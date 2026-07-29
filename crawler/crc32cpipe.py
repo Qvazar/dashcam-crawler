@@ -16,5 +16,8 @@ class Crc32cPipe(Iterable[bytes]):
     def get_crc32c(self):
         return self.checksum.digest()
 
+    def get_crc32c_int(self):
+        return int.from_bytes(self.get_crc32c(), "big")
+
     def get_crc32c_base64(self):
         return base64.b64encode(self.get_crc32c()).decode("utf-8")
