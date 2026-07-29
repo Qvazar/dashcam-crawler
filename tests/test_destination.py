@@ -152,7 +152,7 @@ class TestGoogleCloudStorage:
             gcs.put(str(video_file), video)
 
         mock_client.bucket.return_value.blob.assert_called_once_with(
-            os.path.join("uploads", "video.TS"), chunk_size=10 * 1024 * 1024
+            os.path.join("uploads", "video.TS"), chunk_size=2 * 1024 * 1024
         )
         mock_blob.upload_from_filename.assert_called_once_with(str(video_file), timeout=10)
 
@@ -178,6 +178,6 @@ class TestGoogleCloudStorage:
             gcs.put(str(video_file), video)
 
         mock_client.bucket.return_value.blob.assert_called_once_with(
-            "video.TS", chunk_size=10 * 1024 * 1024
+            "video.TS", chunk_size=2 * 1024 * 1024
         )
         mock_blob.upload_from_filename.assert_called_once_with(str(video_file), timeout=10)
