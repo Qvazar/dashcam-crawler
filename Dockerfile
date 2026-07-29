@@ -1,14 +1,17 @@
-FROM python:3-alpine
+FROM python:3
 
-RUN apk add --no-cache \
-        wireless-tools iproute2 \
-        libffi-dev rust python3-dev build-base
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libffi-dev \
+        wireless-tools \
+        iproute2 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 COPY requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt \
-    && rm requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY crawler/ crawler/
 RUN mkdir -p /app/data
