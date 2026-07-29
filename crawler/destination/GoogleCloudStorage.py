@@ -50,7 +50,7 @@ class GoogleCloudStorage:
         blob.crc32c = file_crc32c  # Set the CRC32C checksum for the new blob
         
         metadata = {
-            "Content-Type": "video/mpeg",
+            "Content-Type": "video/mp2t",
             "Custom-Time": video.recorded_at.isoformat(timespec="seconds")
             }
 

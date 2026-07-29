@@ -6,6 +6,8 @@ import signal
 import sys
 import threading
 
+import requests
+
 from . import debug
 from .network import get_current_ssid
 from .source.fitcamx import fitcamx
@@ -63,6 +65,7 @@ def register_videos_from_source(video_register, source):
     except Exception as e:
         logger.error("Exception when crawling videos: %s", e)
 
+
 def ignore_unmarked_videos(video_register, extended_marked_window=0):
     try:
         ignored_count = video_register.ignore_unmarked_videos(extended_marked_window)
@@ -70,23 +73,30 @@ def ignore_unmarked_videos(video_register, extended_marked_window=0):
     except Exception as e:
         logger.error("Exception when ignoring unmarked videos: %s", e)
 
+
 @debug.timed
 def download_videos_from_source(video_register, source, video_recording_window=0):
     downloaded_count = 0
     try:
         for video in video_register.find_videos_to_download(video_recording_window):
-            stream: Iterator[bytes] = source.download_video(video)
-            videolocalstorage.store_video(video.filename, stream)
+            try:
+                stream: Iterator[bytes] = source.download_video(video)
+                videolocalstorage.store_video(video.filename, stream)
 
-            video.status = VideoStatus.DOWNLOADED
-            video_register.update_videos([video])
-            downloaded_count += 1
+                video.status = VideoStatus.DOWNLOADED
+                video_register.update_videos([video])
+                downloaded_count += 1
 
-            logger.info("Downloaded video: %s", video.filename)
+                logger.info("Downloaded video: %s", video.filename)
+            except FileNotFoundError as e:
+                logger.warning("Video %s not found on source. Marking as 'not found'.", video.filename)
+                video.status = VideoStatus.NOT_FOUND
+                video_register.update_videos([video])
     except Exception as e:
         logger.error("Exception when downloading videos: %s", e)
     finally:
         logger.info("Total downloaded videos: %d", downloaded_count)
+
 
 @debug.timed
 def upload_to_destination(video_register:VideoRegister, destination):

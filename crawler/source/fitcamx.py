@@ -72,6 +72,9 @@ class _FitcamXSource:
         camera_url = _get_camera_url()
         video_url = urljoin(camera_url, video.camera_path)
         with requests.get(video_url, stream=True, timeout=15) as video_stream:
+            if video_stream.status_code == 404:
+                raise FileNotFoundError(f"Video {video.filename} not found at {video_url}")
+            
             video_stream.raise_for_status()
             yield from video_stream.iter_content(chunk_size=2*1024*1024)  # Yield the video stream in chunks for the video
 
