@@ -157,6 +157,8 @@ def main():
     ssid = None
 
     with VideoRegister() as video_register:
+        video_register.vacuum()
+        
         while not shutdown_event.is_set():
             try:
                 new_ssid = get_current_ssid()
@@ -167,12 +169,14 @@ def main():
                 if ssid is None:
                     logger.debug("No WiFi connection. Waiting...")
                 elif ssid == config.camera_ssid:
+                    with video_register.checkpoint():
                         register_videos_from_source(video_register, source)
                         ignore_unmarked_videos(video_register, config.video_extended_marked_window)
                         download_videos_from_source(video_register, source, config.video_recording_window)
                 else:
                     if destination:
-                        upload_to_destination(video_register, destination)
+                        with video_register.checkpoint():
+                            upload_to_destination(video_register, destination)
                         
             except Exception as e:
                 logger.exception("Unexpected error: %s", e)
