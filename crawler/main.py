@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Iterator
 from itertools import chain
 import logging
@@ -9,6 +10,7 @@ import threading
 import requests
 
 from . import debug
+from .crc32cpipe import Crc32cPipe
 from .network import get_current_ssid
 from .source.fitcamx import fitcamx
 from .destination import get_destination_from_url
@@ -80,10 +82,12 @@ def download_videos_from_source(video_register, source, video_recording_window=0
     try:
         for video in video_register.find_videos_to_download(video_recording_window):
             try:
-                stream: Iterator[bytes] = source.download_video(video)
+                stream: Crc32cPipe = Crc32cPipe(source.download_video(video))
                 videolocalstorage.store_video(video.filename, stream)
 
                 video.status = VideoStatus.DOWNLOADED
+                video.crc32c = stream.get_crc32c_base64()
+
                 video_register.update_videos([video])
                 downloaded_count += 1
 

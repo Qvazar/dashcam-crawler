@@ -38,12 +38,15 @@ class VideoRegister:
                 status TEXT NOT NULL, -- uses values from VideoStatus enum
                 recorded_at DATETIME NOT NULL,
                 marked BOOLEAN DEFAULT 0,
+                crc32c TEXT DEFAULT NULL,
                 registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
         conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_marked ON videos(marked) WHERE marked = 1")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_recorded_at ON videos(recorded_at)")
+
         conn.commit()
 
         logger.debug("Database initialized and tables created if they did not exist.")
@@ -65,10 +68,10 @@ class VideoRegister:
 
         with self._db_conn:
             cursor = self._db_conn.executemany('''
-                INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked)
-                VALUES (?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked, crc32c)
+                VALUES (?, ?, ?, ?, ?, ?)
             ''',
-            map(lambda v: (v.filename, v.camera_path, v.status.value, v.recorded_at, v.marked,),
+            map(lambda v: (v.filename, v.camera_path, v.status.value, v.recorded_at, v.marked, v.crc32c),
                 videos)
             )
 
@@ -77,16 +80,16 @@ class VideoRegister:
 
     @debug.timed
     def update_videos(self, videos: Iterable[VideoRecord]):
-        """Updates the status of a video record in the database."""
+        """Updates the status and crc32c of a video record in the database."""
         logger.debug("Entered update_videos()")
 
         with self._db_conn:
             for video in videos:
                 self._db_conn.execute('''
                     UPDATE videos
-                    SET status = ?
+                    SET status = ?, crc32c = ?
                     WHERE filename = ?
-                ''', (video.status.value, video.filename))
+                ''', (video.status.value, video.crc32c, video.filename))
 
         logger.debug("Exiting update_videos()")
 
@@ -129,7 +132,7 @@ class VideoRegister:
             # This is done by checking if the registered_at is older than a certain window (video_recording_window) from the current db time.
             cursor = self._db_conn.execute(
                 """
-                SELECT filename, camera_path, status, recorded_at, marked, registered_at
+                SELECT filename, camera_path, status, recorded_at, marked, crc32c, registered_at
                 FROM videos
                 WHERE status = ?
                     AND (registered_at <= datetime('now', ?))
@@ -145,7 +148,7 @@ class VideoRegister:
         with self._db_conn:
             cursor = self._db_conn.execute(
                 """
-                SELECT filename, camera_path, status, recorded_at, marked, registered_at
+                SELECT filename, camera_path, status, recorded_at, marked, crc32c, registered_at
                 FROM videos
                 WHERE status = ?
                 """,
