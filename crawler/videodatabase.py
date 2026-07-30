@@ -14,11 +14,11 @@ sqlite3.register_adapter(datetime, lambda val: val.replace(tzinfo=None).isoforma
 sqlite3.register_converter("DATETIME", lambda val: datetime.fromisoformat(val.decode("utf-8")) if val else None)
 
 
-class VideoRegister:
+class VideoDatabase:
     """Handles database operations for video records."""
-    
+
     def __init__(self):
-        pass
+        self._db_conn = None
 
     @debug.timed
     def _init_database(self):
@@ -26,9 +26,14 @@ class VideoRegister:
         logger.debug("Entered _init_database()")
 
         conn = sqlite3.connect(DB_FILENAME, detect_types=sqlite3.PARSE_DECLTYPES)
-        # WAL mode and FULL synchronization protect against corruption during power cuts
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous = FULL;")
+        conn.execute("PRAGMA journal_mode=WAL;") # Use Write-Ahead Logging for better crash and power-loss safety
+        conn.execute("PRAGMA synchronous = FULL;") # Always write to disk before returning from a transaction to ensure data integrity
+        conn.execute("PRAGMA foreign_keys = ON;")  # Ensure foreign key constraints are enforced
+        conn.execute("PRAGMA busy_timeout = 5000;")  # Wait up to 5 seconds if the database is locked
+        conn.execute("PRAGMA temp_store = MEMORY;")  # Store temporary tables in memory for performance
+        conn.execute("PRAGMA mmap_size = 33554432;")  # Allow up to 32 MB of memory-mapped I/O for performance
+        conn.execute("PRAGMA threads = 0;") # Do not use any additional threads for SQLite operations.
+        conn.execute("PRAGMA trusted_schema = OFF;")  # Disable trusted schema to prevent potential security issues. Also improves performance by avoiding unnecessary checks.
         conn.autocommit = False  # Ensure transactions are committed explicitly
         
         conn.execute('''
@@ -40,14 +45,18 @@ class VideoRegister:
                 marked BOOLEAN DEFAULT 0,
                 crc32c TEXT DEFAULT NULL,
                 registered_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
+            ) WITHOUT ROWID
         ''')
 
         conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_marked ON videos(marked) WHERE marked = 1")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_marked ON videos(marked)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_recorded_at ON videos(recorded_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_videos_registered_at ON videos(registered_at)")
 
         conn.commit()
+
+        self._do_checkpoint(conn)  # Ensure WAL is checkpointed after initialization
+        conn.execute("PRAGMA optimize;")  # Optimize the database for performance
 
         logger.debug("Database initialized and tables created if they did not exist.")
         logger.debug("Exiting _init_database()")
@@ -59,7 +68,22 @@ class VideoRegister:
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
+        self._do_checkpoint()  # Ensure WAL is checkpointed before closing
         self._db_conn.close()
+
+    @debug.timed
+    def _do_checkpoint(self, conn = None):
+        """Perform a WAL checkpoint to ensure all transactions are flushed to the main database file."""
+        logger.debug("Performing WAL checkpoint.")
+
+        if conn is None:
+            conn = self._db_conn
+
+        conn.execute("PRAGMA wal_checkpoint(RESTART);")
+
+    def checkpoint(self):
+        """Returns a context manager that performs a WAL checkpoint on exit."""
+        return _CheckpointContextManager(self)
 
     @debug.timed
     def insert_videos(self, videos: Iterable[VideoRecord]):
@@ -156,3 +180,17 @@ class VideoRegister:
             )
             for row in cursor:
                 yield VideoRecord(*row)
+
+
+class _CheckpointContextManager:
+    """Context manager for database checkpointing."""
+    
+    def __init__(self, db):
+        self._db = db
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._db._do_checkpoint()
+

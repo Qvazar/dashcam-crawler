@@ -16,7 +16,7 @@ from .source.fitcamx import fitcamx
 from .destination import get_destination_from_url
 from .videolocalstorage import videolocalstorage
 from .videorecord import VideoStatus
-from .videoregister import VideoRegister
+from .videodatabase import VideoDatabase
 
 
 logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(name)s %(message)s')
@@ -61,26 +61,26 @@ class Config:
 
 
 @debug.timed
-def register_videos_from_source(video_register, source):
+def register_videos_from_source(videodb, source):
     try:
-        video_register.insert_videos(source.find_videos())
+        videodb.insert_videos(source.find_videos())
     except Exception as e:
         logger.error("Exception when crawling videos: %s", e)
 
 
-def ignore_unmarked_videos(video_register, extended_marked_window=0):
+def ignore_unmarked_videos(videodb, extended_marked_window=0):
     try:
-        ignored_count = video_register.ignore_unmarked_videos(extended_marked_window)
+        ignored_count = videodb.ignore_unmarked_videos(extended_marked_window)
         logger.info("Ignored %d unmarked videos outside the marked window.", ignored_count)
     except Exception as e:
         logger.error("Exception when ignoring unmarked videos: %s", e)
 
 
 @debug.timed
-def download_videos_from_source(video_register, source, video_recording_window=0):
+def download_videos_from_source(videodb, source, video_recording_window=0):
     downloaded_count = 0
     try:
-        for video in video_register.find_videos_to_download(video_recording_window):
+        for video in videodb.find_videos_to_download(video_recording_window):
             try:
                 stream: Crc32cPipe = Crc32cPipe(source.download_video(video))
                 videolocalstorage.store_video(video.filename, stream)
@@ -88,14 +88,14 @@ def download_videos_from_source(video_register, source, video_recording_window=0
                 video.status = VideoStatus.DOWNLOADED
                 video.crc32c = stream.get_crc32c_base64()
 
-                video_register.update_videos([video])
+                videodb.update_videos([video])
                 downloaded_count += 1
 
                 logger.info("Downloaded video: %s", video.filename)
             except FileNotFoundError as e:
                 logger.warning("Video %s not found on source. Marking as 'not found'.", video.filename)
                 video.status = VideoStatus.NOT_FOUND
-                video_register.update_videos([video])
+                videodb.update_videos([video])
     except Exception as e:
         logger.error("Exception when downloading videos: %s", e)
     finally:
@@ -103,9 +103,9 @@ def download_videos_from_source(video_register, source, video_recording_window=0
 
 
 @debug.timed
-def upload_to_destination(video_register:VideoRegister, destination):
+def upload_to_destination(videodb:VideoDatabase, destination):
     try:
-        videos = video_register.find_downloaded_videos()
+        videos = videodb.find_downloaded_videos()
         first_video = next(videos, None)
 
         if first_video is None:
@@ -124,13 +124,13 @@ def upload_to_destination(video_register:VideoRegister, destination):
                     videolocalstorage.delete_video(v.filename)
 
                     v.status = VideoStatus.UPLOADED
-                    video_register.update_videos([v])
+                    videodb.update_videos([v])
 
                     logger.info("Successfully uploaded %s and removed it from local storage.", v.filename)
                 except FileNotFoundError:
                     logger.warning("File %s is missing from local storage. Resetting status to 'found'.", v.filename)
                     v.status = VideoStatus.FOUND
-                    video_register.update_videos([v])
+                    videodb.update_videos([v])
     except Exception as e:
         logger.exception("Error during upload: %s", e)
 
@@ -156,9 +156,7 @@ def main():
 
     ssid = None
 
-    with VideoRegister() as video_register:
-        video_register.vacuum()
-        
+    with VideoDatabase() as videodb:
         while not shutdown_event.is_set():
             try:
                 new_ssid = get_current_ssid()
@@ -169,14 +167,14 @@ def main():
                 if ssid is None:
                     logger.debug("No WiFi connection. Waiting...")
                 elif ssid == config.camera_ssid:
-                    with video_register.checkpoint():
-                        register_videos_from_source(video_register, source)
-                        ignore_unmarked_videos(video_register, config.video_extended_marked_window)
-                        download_videos_from_source(video_register, source, config.video_recording_window)
+                    with videodb.checkpoint():
+                        register_videos_from_source(videodb, source)
+                        ignore_unmarked_videos(videodb, config.video_extended_marked_window)
+                        download_videos_from_source(videodb, source, config.video_recording_window)
                 else:
                     if destination:
-                        with video_register.checkpoint():
-                            upload_to_destination(video_register, destination)
+                        with videodb.checkpoint():
+                            upload_to_destination(videodb, destination)
                         
             except Exception as e:
                 logger.exception("Unexpected error: %s", e)
