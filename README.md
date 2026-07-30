@@ -20,13 +20,15 @@ The crawler loop:
 
 ## Requirements
 
-- Debian-based Linux with `apt` and Podman packages available (tested on Debian Trixie).
+- Any ARM or AMD64 system with Podman support (tested on Raspberry Pi OS (32-bit), a port of Debian Trixie).
 - `sudo` / root access.
 - Network setup that can connect to both:
   - the dashcam Wi-Fi
   - an upload network (home Wi-Fi, hotspot, etc.)
 
 The service runs as a [Podman](https://podman.io/) container managed by systemd via a [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) unit.
+
+The install script assumes a Debian compatible OS and will install Podman if it is not installed.
 
 ## Installation
 
