@@ -2,7 +2,7 @@ import base64
 
 import google_crc32c
 
-from crawler.crc32cpipe import Crc32cPipe
+from crawler.checksum import Crc32cPipe
 
 
 def test_crc32cpipe_accumulates_checksum_and_base64():
