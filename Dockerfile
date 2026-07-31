@@ -9,8 +9,10 @@ RUN apk add --no-cache \
         py3-paramiko \
         py3-pytest \
         ## --- google-cloud-storage dependencies
-        py3-protobuf py3-proto-plus py3-invoke py3-asn1 py3-asn1-modules py3-google-api-core py3-googleapis-common-protos
+        py3-protobuf py3-proto-plus py3-invoke py3-asn1 py3-asn1-modules py3-google-api-core py3-googleapis-common-protos \
         ## --- google-cloud-storage dependencies
+        ## --- build dependencies for crc32c
+        gcc musl-dev crc32c-dev
 
 WORKDIR /app
 
