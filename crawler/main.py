@@ -1,4 +1,3 @@
-import base64
 from collections.abc import Iterator
 from itertools import chain
 import logging
@@ -7,10 +6,8 @@ import signal
 import sys
 import threading
 
-import requests
-
 from . import debug
-from .crc32cpipe import Crc32cPipe
+from .checksum import Crc32cPipe
 from .network import get_current_ssid
 from .source.fitcamx import fitcamx
 from .destination import get_destination_from_url
