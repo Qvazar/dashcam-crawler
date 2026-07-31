@@ -228,8 +228,8 @@ start_service() {
     fi
     info "Reloading systemd daemon..."
     systemctl daemon-reload
-    info "Enabling and starting $SERVICE_NAME..."
-    systemctl enable --now "$SERVICE_NAME"
+    info "Starting $SERVICE_NAME..."
+    systemctl start "$SERVICE_NAME"
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
