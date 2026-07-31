@@ -35,6 +35,9 @@ def _crawl_url(url: str):
 
     response = requests.get(url, timeout=10)
     response.raise_for_status()
+
+    logger.debug(f"Received response from {url} with status code {response.status_code}")
+    logger.debug(f"Response content: {response.text[:500]}...")  # Log first 500 characters of the response for debugging
     
     soup = BeautifulSoup(response.text, 'html.parser')
     
@@ -42,6 +45,9 @@ def _crawl_url(url: str):
         href = link.get('href')
         if href:
             found_url = urljoin(url, href)
+
+            logger.debug(f"Found link: {found_url}")
+
             if any(href.endswith(ext) for ext in VIDEO_EXTENSIONS):
                 video_path = urlsplit(found_url).path
                 filename = os.path.basename(video_path)
@@ -53,6 +59,7 @@ def _crawl_url(url: str):
                 yield VideoRecord(filename, video_path, VideoStatus.FOUND, video_recorded_at, marked)
             elif href.find(".") == -1:  # Likely a directory (no file extension)
                 # Recursively crawl subdirectories
+                logger.debug(f"Found directory: {found_url}, recursing into it.")
                 yield from _crawl_url(found_url)
 
 
