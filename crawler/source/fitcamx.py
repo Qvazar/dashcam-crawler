@@ -1,8 +1,6 @@
-from collections.abc import Iterable
 from datetime import datetime
 import logging
 import os
-import re
 from typing import Iterator
 from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
@@ -15,6 +13,22 @@ logger = logging.getLogger(__name__)
 
 FITCAMX_MARKED_VIDEO_DIRS = os.environ.get("FITCAMX_MARKED_VIDEO_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
 VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS").split(",")  # Comma-separated list of video file extensions to consider
+
+
+def _log_crawl_url_response_to_file(url: str, response: requests.Response):
+    """Log the response of a crawl URL to a file for debugging purposes."""
+    if logger.isEnabledFor(logging.DEBUG):
+        log_dir = os.path.join(os.getcwd(), "fitcamx_logs")
+        os.makedirs(log_dir, exist_ok=True)
+        log_file_path = os.path.join(log_dir, f"{datetime.now().isoformat(timespec='seconds')}_{urlsplit(url).path}.log")
+        
+        with open(log_file_path, "w", encoding="utf-8") as log_file:
+            log_file.write(f"URL: {url}\n")
+            log_file.write(f"Status Code: {response.status_code}\n")
+            log_file.write("Response Content:\n")
+            log_file.write(response.text)
+        
+        logger.debug(f"fitcamx response logged to {log_file_path}")
 
 
 def _datetime_from_filename(filename) -> datetime:
@@ -36,12 +50,13 @@ def _crawl_url(url: str):
     response = requests.get(url, timeout=10)
     response.raise_for_status()
 
-    logger.debug(f"Received response from {url} with status code {response.status_code}")
-    logger.debug(f"Response content: {response.text[:500]}...")  # Log first 500 characters of the response for debugging
-    
     soup = BeautifulSoup(response.text, 'html.parser')
+    links = soup.find_all('a')
+
+    logger.debug(f"Received response from {url} with status code {response.status_code} and found {len(links)} links.")
+    _log_crawl_url_response_to_file(url, response)
     
-    for link in soup.find_all('a'):
+    for link in links:
         href = link.get('href')
         if href:
             found_url = urljoin(url, href)
