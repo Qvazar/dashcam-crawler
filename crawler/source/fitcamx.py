@@ -81,19 +81,25 @@ def _crawl_url(url: str):
 def _guess_time_offset(videos: list[VideoRecord]) -> timedelta:
     """Guess the time offset between camera clock and real time.
 
-    Compares the latest video's recorded timestamp to the current time, rounded
-    to the nearest hour (the camera clock is typically off by a whole number of
-    hours due to winter/summer time differences).  Returns a timedelta to add to
-    each video's recorded_at so that it approximates real wall-clock time.
+    Compares the latest video's recorded timestamp (a naive local datetime parsed
+    from the filename) to the current local wall-clock time, then rounds the
+    difference to the nearest whole hour.  The camera clock is typically off by
+    exactly one or two hours because of winter/summer time, so this heuristic is
+    reliable as long as the crawl happens while the camera is still recording
+    (i.e. the most recent video was captured within the last few minutes).
+
+    Both datetimes are naive and represent the same local timezone, so the
+    subtraction is safe and consistent.
+
+    Returns a timedelta to add to every video's recorded_at.
     """
     if not videos:
         return timedelta(0)
     latest = max(videos, key=lambda v: v.recorded_at)
-    now = datetime.now()
+    now = datetime.now()  # naive local time, consistent with recorded_at
     raw_offset = now - latest.recorded_at
-    # Round to the nearest whole hour
-    total_seconds = raw_offset.total_seconds()
-    rounded_hours = round(total_seconds / 3600)
+    # Round to the nearest whole hour — the camera is off by a whole number of hours
+    rounded_hours = round(raw_offset.total_seconds() / 3600)
     offset = timedelta(hours=rounded_hours)
     if offset:
         logger.info(
