@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 import os
 from typing import Iterator
@@ -78,6 +78,33 @@ def _crawl_url(url: str):
                 yield from _crawl_url(found_url)
 
 
+def _guess_time_offset(videos: list[VideoRecord]) -> timedelta:
+    """Guess the time offset between camera clock and real time.
+
+    Compares the latest video's recorded timestamp to the current time, rounded
+    to the nearest hour (the camera clock is typically off by a whole number of
+    hours due to winter/summer time differences).  Returns a timedelta to add to
+    each video's recorded_at so that it approximates real wall-clock time.
+    """
+    if not videos:
+        return timedelta(0)
+    latest = max(videos, key=lambda v: v.recorded_at)
+    now = datetime.now()
+    raw_offset = now - latest.recorded_at
+    # Round to the nearest whole hour
+    total_seconds = raw_offset.total_seconds()
+    rounded_hours = round(total_seconds / 3600)
+    offset = timedelta(hours=rounded_hours)
+    if offset:
+        logger.info(
+            "Guessed camera time offset: %s (raw diff: %s, based on latest video %s)",
+            offset,
+            raw_offset,
+            latest.filename,
+        )
+    return offset
+
+
 class _FitcamXSource:
     def __init__(self):
         pass
@@ -86,7 +113,12 @@ class _FitcamXSource:
     def find_videos(self):
         camera_url = _get_camera_url()
         logger.info(f"Camera URL determined as: {camera_url}")
-        return _crawl_url(camera_url)
+        videos = list(_crawl_url(camera_url))
+        offset = _guess_time_offset(videos)
+        if offset:
+            for v in videos:
+                v.recorded_at += offset
+        return iter(videos)
 
     @timed
     def download_video(self, video: VideoRecord) -> Iterator[bytes]:
