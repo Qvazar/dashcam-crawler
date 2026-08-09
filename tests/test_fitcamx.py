@@ -1,5 +1,6 @@
 """Tests for crawler/source/fitcamx.py"""
 from datetime import datetime
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,14 +12,7 @@ from crawler.videorecord import VideoStatus
 # HTML fixtures mimicking real FitCamX camera responses
 # ---------------------------------------------------------------------------
 
-ROOT_HTML = """\
-<html><body>
-<table cellpadding=5>
-<th>Filename<th>Filesize<th>Filetime
-<tr><td><a href="/CARDV"><b>CARDV</b></a><td align=center><i>folder</i><td align=right>2026/01/09 09:16:48
-</table>
-</body></html>
-"""
+ROOT_HTML = Path(__file__).with_name("fitcamx_root.html").read_text(encoding="utf-8")
 
 CARDV_HTML = """\
 <html><body>
@@ -100,7 +94,7 @@ class TestCrawlUrl:
     @patch("crawler.source.fitcamx.requests.get")
     def test_discovers_videos_recursively(self, mock_get):
         mock_get.side_effect = self._url_to_html
-        videos = list(_crawl_url("http://192.168.1.254"))
+        videos = _crawl_url("http://192.168.1.254")
         filenames = [v.filename for v in videos]
         assert "20260709112750_036576A.TS" in filenames
         assert "20260710080000_036600A.TS" in filenames

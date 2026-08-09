@@ -59,9 +59,9 @@ def _crawl_url(url: str):
     for link in links:
         href = link.get('href')
         if href:
-            found_url = urljoin(url, href)
+            logger.debug(f"Parsing link: {href}")
 
-            logger.debug(f"Found link: {found_url}")
+            found_url = urljoin(url, href)
 
             if any(href.endswith(ext) for ext in VIDEO_EXTENSIONS):
                 video_path = urlsplit(found_url).path
