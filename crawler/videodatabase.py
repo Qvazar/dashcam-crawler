@@ -93,10 +93,16 @@ class VideoDatabase:
         with self._db_conn:
             cursor = self._db_conn.executemany('''
                 INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked, crc32c)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (:filename, :camera_path, :status, :recorded_at, :marked, :crc32c)
             ''',
-            map(lambda v: (v.filename, v.camera_path, v.status.value, v.recorded_at, v.marked, v.crc32c),
-                videos)
+            map(lambda v: {
+                'filename': v.filename,
+                'camera_path': v.camera_path,
+                'status': v.status.value,
+                'recorded_at': v.recorded_at,
+                'marked': v.marked,
+                'crc32c': v.crc32c
+            }, videos)
             )
 
             logger.debug("Exiting insert_videos()")
@@ -111,9 +117,13 @@ class VideoDatabase:
             for video in videos:
                 self._db_conn.execute('''
                     UPDATE videos
-                    SET status = ?, crc32c = ?
-                    WHERE filename = ?
-                ''', (video.status.value, video.crc32c, video.filename))
+                    SET status = :status, crc32c = :crc32c
+                    WHERE filename = :filename
+                ''', {
+                    'status': video.status.value,
+                    'crc32c': video.crc32c,
+                    'filename': video.filename
+                })
 
         logger.debug("Exiting update_videos()")
 
@@ -126,23 +136,22 @@ class VideoDatabase:
             cursor = self._db_conn.execute(
                 """
                 UPDATE videos
-                SET status = ?
+                SET status = :status_ignored
                 WHERE marked = 0
-                    AND status = ?
+                    AND status = :status_found
                     AND NOT EXISTS (
                         SELECT 1 FROM videos AS marked_v
                         WHERE marked_v.marked = 1
-                        AND marked_v.status = ?
-                        AND datetime(videos.recorded_at) BETWEEN datetime(marked_v.recorded_at, ?) AND datetime(marked_v.recorded_at, ?)
+                        AND marked_v.status = :status_found
+                        AND datetime(videos.recorded_at) BETWEEN datetime(marked_v.recorded_at, :marked_window_start) AND datetime(marked_v.recorded_at, :marked_window_end)
                     )
                 """,
-                (
-                    VideoStatus.IGNORED.value,
-                    VideoStatus.FOUND.value,
-                    VideoStatus.FOUND.value,
-                    f'-{marked_window} minutes',
-                    f'+{marked_window} minutes'
-                )
+                {
+                    'status_ignored': VideoStatus.IGNORED.value,
+                    'status_found': VideoStatus.FOUND.value,
+                    'marked_window_start': f'-{marked_window} minutes',
+                    'marked_window_end': f'+{marked_window} minutes'
+                }
             )
 
             logger.debug("Exiting ignore_unmarked_videos()")
@@ -158,10 +167,13 @@ class VideoDatabase:
                 """
                 SELECT filename, camera_path, status, recorded_at, marked, crc32c, registered_at
                 FROM videos
-                WHERE status = ?
-                    AND (registered_at <= datetime('now', ?))
+                WHERE status = :status_found
+                    AND (registered_at <= datetime('now', :video_recording_window))
                 """,
-                (VideoStatus.FOUND.value, f'-{video_recording_window} minutes')
+                {
+                    'status_found': VideoStatus.FOUND.value,
+                    'video_recording_window': f'-{video_recording_window} minutes'
+                }
             )
             for row in cursor:
                 yield VideoRecord(*row)
@@ -174,9 +186,11 @@ class VideoDatabase:
                 """
                 SELECT filename, camera_path, status, recorded_at, marked, crc32c, registered_at
                 FROM videos
-                WHERE status = ?
+                WHERE status = :status_downloaded
                 """,
-                (VideoStatus.DOWNLOADED.value,)
+                {
+                    'status_downloaded': VideoStatus.DOWNLOADED.value
+                }
             )
             for row in cursor:
                 yield VideoRecord(*row)

@@ -1,4 +1,5 @@
 """Tests for crawler/videodatabase.py"""
+from collections.abc import Iterable
 from datetime import datetime
 from unittest.mock import patch
 
