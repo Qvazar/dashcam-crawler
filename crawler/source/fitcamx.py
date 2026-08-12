@@ -18,17 +18,22 @@ VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS").split(",")  # Comma
 def _log_crawl_url_response_to_file(url: str, response: requests.Response):
     """Log the response of a crawl URL to a file for debugging purposes."""
     if logger.isEnabledFor(logging.DEBUG):
-        log_dir = os.path.join(os.getcwd(), "fitcamx_logs")
-        os.makedirs(log_dir, exist_ok=True)
-        log_file_path = os.path.join(log_dir, f"{datetime.now().isoformat(timespec='seconds')}_{urlsplit(url).path}.log")
-        
-        with open(log_file_path, "w", encoding="utf-8") as log_file:
-            log_file.write(f"URL: {url}\n")
-            log_file.write(f"Status Code: {response.status_code}\n")
-            log_file.write("Response Content:\n")
-            log_file.write(response.text)
-        
-        logger.debug(f"fitcamx response logged to {log_file_path}")
+        try:
+            log_dir = os.path.join(os.getcwd(), "fitcamx_logs")
+            os.makedirs(log_dir, exist_ok=True)
+
+            url_path = urlsplit(url).path.replace('/', '_').strip('_') or 'root'
+            log_file_path = os.path.join(log_dir, f"{datetime.now().isoformat(timespec='seconds')}_{url_path}.log")
+            
+            with open(log_file_path, "w", encoding="utf-8") as log_file:
+                log_file.write(f"URL: {url}\n")
+                log_file.write(f"Status Code: {response.status_code}\n")
+                log_file.write("Response Content:\n")
+                log_file.write(response.text)
+            
+            logger.debug(f"fitcamx response logged to {log_file_path}")
+        except Exception as e:
+            logger.error(f"Failed to log fitcamx response to file: {e}")
 
 
 def _datetime_from_filename(filename) -> datetime:
@@ -45,6 +50,8 @@ def _get_camera_url() -> str:
 
 def _crawl_url(url: str):
     """Crawls a given URL and yields found videos."""
+    logger.debug("Entered _crawl_url()")
+
     logger.info(f"Crawling URL: {url}")
 
     response = requests.get(url, timeout=10)
@@ -77,6 +84,8 @@ def _crawl_url(url: str):
                 logger.debug(f"Found directory: {found_url}, recursing into it.")
                 yield from _crawl_url(found_url)
 
+    logger.debug("Exiting _crawl_url()")
+
 
 class _FitcamXSource:
     def __init__(self):
@@ -85,7 +94,7 @@ class _FitcamXSource:
     @timed
     def find_videos(self):
         camera_url = _get_camera_url()
-        logger.info(f"Camera URL determined as: {camera_url}")
+        logger.info(f"Camera URL determined as: {camera_url}")        
         return _crawl_url(camera_url)
 
     @timed
