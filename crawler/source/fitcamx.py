@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 FITCAMX_MARKED_VIDEO_DIRS = os.environ.get("FITCAMX_MARKED_VIDEO_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
 VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS").split(",")  # Comma-separated list of video file extensions to consider
 
+logger.debug(f"FITCAMX_MARKED_VIDEO_DIRS: {FITCAMX_MARKED_VIDEO_DIRS}")
+logger.debug(f"VIDEO_EXTENSIONS: {VIDEO_EXTENSIONS}")
+
 
 def _log_crawl_url_response_to_file(url: str, response: requests.Response):
     """Log the response of a crawl URL to a file for debugging purposes."""
@@ -70,7 +73,7 @@ def _crawl_url(url: str):
 
             found_url = urljoin(url, href)
 
-            if any(href.endswith(ext) for ext in VIDEO_EXTENSIONS):
+            if any(href.strip().endswith(ext) for ext in VIDEO_EXTENSIONS):
                 video_path = urlsplit(found_url).path
                 filename = os.path.basename(video_path)
                 video_recorded_at: datetime = _datetime_from_filename(filename)
