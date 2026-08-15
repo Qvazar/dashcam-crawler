@@ -26,7 +26,7 @@ def _log_crawl_url_response_to_file(url: str, response: requests.Response):
             os.makedirs(log_dir, exist_ok=True)
 
             url_path = urlsplit(url).path.replace('/', '_').strip('_') or 'root'
-            log_file_path = os.path.join(log_dir, f"{datetime.now().isoformat(timespec='seconds')}_{url_path}.log")
+            log_file_path = os.path.join(log_dir, f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{url_path}.log")
             
             with open(log_file_path, "w", encoding="utf-8") as log_file:
                 log_file.write(f"URL: {url}\n")

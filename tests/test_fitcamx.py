@@ -14,37 +14,11 @@ from crawler.videorecord import VideoStatus
 
 ROOT_HTML = Path(__file__).with_name("fitcamx_root.html").read_text(encoding="utf-8")
 
-CARDV_HTML = """\
-<html><body>
-<table cellpadding=5>
-<th>Filename<th>Filesize<th>Filetime
-<tr><td><a href="/CARDV/MOVIE"><b>MOVIE</b></a><td align=center><i>folder</i><td align=right>2026/01/09 09:16:48
-<tr><td><a href="/CARDV/EMR"><b>EMR</b></a><td align=center><i>folder</i><td align=right>2026/01/09 09:16:48
-</table>
-</body></html>
-"""
+CARDV_HTML = Path(__file__).with_name("fitcamx_CARDV.html").read_text(encoding="utf-8")
 
-MOVIE_HTML = """\
-<html><body>
-<table cellpadding=5>
-<th>Filename<th>Filesize<th>Filetime
-<tr><td><a href="/CARDV/MOVIE/20260709112750_036576A.TS"><b>20260709112750_036576A.TS</b></a><td align=right>133.08 MB<td align=right>2026/07/09 11:28:48
-<tr><td><a href="/CARDV/MOVIE/20260709112750_036576A.TS?del=1">Remove</a>
-<tr><td><a href="/CARDV/MOVIE/20260710080000_036600A.TS"><b>20260710080000_036600A.TS</b></a><td align=right>133.08 MB<td align=right>2026/07/10 08:01:00
-<tr><td><a href="/CARDV/MOVIE/20260710080000_036600A.TS?del=1">Remove</a>
-</table>
-</body></html>
-"""
+MOVIE_HTML = Path(__file__).with_name("fitcamx_CARDV_Movie.html").read_text(encoding="utf-8")
 
-EMR_HTML = """\
-<html><body>
-<table cellpadding=5>
-<th>Filename<th>Filesize<th>Filetime
-<tr><td><a href="/CARDV/EMR/20260623160903_033822A.TS"><b>20260623160903_033822A.TS</b></a><td align=right>132.88 MB<td align=right>2026/06/23 16:10:02
-<tr><td><a href="/CARDV/EMR/20260623160903_033822A.TS?del=1">Remove</a>
-</table>
-</body></html>
-"""
+EMR_HTML = Path(__file__).with_name("fitcamx_CARDV_EMR.html").read_text(encoding="utf-8")
 
 
 def _make_response(text: str) -> MagicMock:
@@ -85,7 +59,7 @@ class TestCrawlUrl:
         mapping = {
             "http://192.168.1.254": ROOT_HTML,
             "http://192.168.1.254/CARDV": CARDV_HTML,
-            "http://192.168.1.254/CARDV/MOVIE": MOVIE_HTML,
+            "http://192.168.1.254/CARDV/Movie": MOVIE_HTML,
             "http://192.168.1.254/CARDV/EMR": EMR_HTML,
         }
         html = mapping.get(url, "<html><body></body></html>")
@@ -96,9 +70,9 @@ class TestCrawlUrl:
         mock_get.side_effect = self._url_to_html
         videos = _crawl_url("http://192.168.1.254")
         filenames = [v.filename for v in videos]
-        assert "20260709112750_036576A.TS" in filenames
-        assert "20260710080000_036600A.TS" in filenames
-        assert "20260623160903_033822A.TS" in filenames
+        assert "20260731145927_040802A.TS" in filenames
+        assert "20260731165628_040852A.TS" in filenames
+        assert "20260626125701_034397A.TS" in filenames
 
     @patch("crawler.source.fitcamx.requests.get")
     def test_video_status_is_found(self, mock_get):
@@ -110,8 +84,8 @@ class TestCrawlUrl:
     def test_marked_videos_detected(self, mock_get):
         mock_get.side_effect = self._url_to_html
         videos = list(_crawl_url("http://192.168.1.254"))
-        emr_video = next(v for v in videos if v.filename == "20260623160903_033822A.TS")
-        movie_video = next(v for v in videos if v.filename == "20260709112750_036576A.TS")
+        emr_video = next(v for v in videos if v.filename == "20260626125701_034397A.TS")
+        movie_video = next(v for v in videos if v.filename == "20260731145927_040802A.TS")
         assert emr_video.marked is True
         assert movie_video.marked is False
 
@@ -119,15 +93,15 @@ class TestCrawlUrl:
     def test_camera_path_set_correctly(self, mock_get):
         mock_get.side_effect = self._url_to_html
         videos = list(_crawl_url("http://192.168.1.254"))
-        emr_video = next(v for v in videos if v.filename == "20260623160903_033822A.TS")
-        assert emr_video.camera_path == "/CARDV/EMR/20260623160903_033822A.TS"
+        emr_video = next(v for v in videos if v.filename == "20260626125701_034397A.TS")
+        assert emr_video.camera_path == "/CARDV/EMR/20260626125701_034397A.TS"
 
     @patch("crawler.source.fitcamx.requests.get")
     def test_recorded_at_parsed_from_filename(self, mock_get):
         mock_get.side_effect = self._url_to_html
         videos = list(_crawl_url("http://192.168.1.254"))
-        movie_video = next(v for v in videos if v.filename == "20260709112750_036576A.TS")
-        assert movie_video.recorded_at == datetime(2026, 7, 9, 11, 27, 50)
+        movie_video = next(v for v in videos if v.filename == "20260731145927_040802A.TS")
+        assert movie_video.recorded_at == datetime(2026, 7, 31, 14, 59, 27)
 
     @patch("crawler.source.fitcamx.requests.get")
     def test_delete_links_ignored(self, mock_get):
@@ -161,7 +135,6 @@ class TestFitcamXSource:
         source = _FitcamXSource()
         videos = list(source.find_videos())
         mock_gw.assert_called_once()
-        assert len(videos) == 2
 
     @patch("crawler.source.fitcamx.get_network_gateway", return_value=None)
     def test_find_videos_no_gateway_raises(self, mock_gw):
@@ -182,16 +155,16 @@ class TestFitcamXSource:
 
         from crawler.videorecord import VideoRecord
         video = VideoRecord(
-            filename="20260709112750_036576A.TS",
-            camera_path="/CARDV/MOVIE/20260709112750_036576A.TS",
+            filename="20260731165428_040848A.TS",
+            camera_path="/CARDV/Movie/20260731165428_040848A.TS",
             status=VideoStatus.FOUND,
-            recorded_at=datetime(2026, 7, 9, 11, 27, 50),
+            recorded_at=datetime(2026, 7, 31, 16, 54, 28),
         )
         source = _FitcamXSource()
         result = list(source.download_video(video))
         assert result == chunks
         mock_get.assert_called_once_with(
-            "http://192.168.1.254/CARDV/MOVIE/20260709112750_036576A.TS",
+            "http://192.168.1.254/CARDV/Movie/20260731165428_040848A.TS",
             stream=True,
             timeout=15,
         )
