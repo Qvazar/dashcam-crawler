@@ -1,14 +1,12 @@
 import os
-import base64
-import logging
 from google.cloud import storage
-import google_crc32c
 
 from crawler.videorecord import VideoRecord
+from crawler.logging import getLogger
 
 _CHUNK_SIZE = 2 * 1024 * 1024  # 2 MB
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 class GoogleCloudStorage:
     @staticmethod

@@ -1,12 +1,12 @@
 from collections.abc import Iterator
 from itertools import chain
-import logging
 import os
 import signal
 import sys
 import threading
 
 from . import debug
+from .logging import getLogger
 from .checksum import Crc32cPipe
 from .network import get_current_ssid
 from .source.fitcamx import fitcamx
@@ -15,10 +15,7 @@ from .videolocalstorage import videolocalstorage
 from .videorecord import VideoStatus
 from .videodatabase import VideoDatabase
 
-
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO").upper(), format='%(asctime)s %(levelname)s %(name)s %(message)s')
-logger = logging.getLogger(__name__)
-
+logger = getLogger(__name__)
 
 # --- CONFIGURATION ---
 class Config:

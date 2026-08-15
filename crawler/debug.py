@@ -1,15 +1,15 @@
 from functools import wraps
 import time
-import logging
+from .logging import getLogger
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 def timed(f):
     """Decorator to measure the execution time of a function."""
 
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if logger.isEnabledFor(logging.DEBUG):
+        if logger.isDebugEnabled():
             start_time = time.perf_counter()
             result = f(*args, **kwargs)
             end_time = time.perf_counter()

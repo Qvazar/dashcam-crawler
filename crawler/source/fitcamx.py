@@ -1,15 +1,15 @@
 from datetime import datetime
-import logging
 import os
 from typing import Iterator
 from urllib.parse import urljoin, urlsplit
 from bs4 import BeautifulSoup
 import requests
 from ..debug import timed
+from ..logging import getLogger
 from ..network import get_network_gateway
 from ..videorecord import VideoRecord, VideoStatus
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 FITCAMX_MARKED_VIDEO_DIRS = os.environ.get("FITCAMX_MARKED_VIDEO_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
 VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS").split(",")  # Comma-separated list of video file extensions to consider
@@ -20,7 +20,7 @@ logger.debug(f"VIDEO_EXTENSIONS: {VIDEO_EXTENSIONS}")
 
 def _log_crawl_url_response_to_file(url: str, response: requests.Response):
     """Log the response of a crawl URL to a file for debugging purposes."""
-    if logger.isEnabledFor(logging.DEBUG):
+    if logger.isDebugEnabled():
         try:
             log_dir = os.path.join(os.getcwd(), "fitcamx_logs")
             os.makedirs(log_dir, exist_ok=True)
@@ -86,6 +86,8 @@ def _crawl_url(url: str):
                 # Recursively crawl subdirectories
                 logger.debug(f"Found directory: {found_url}, recursing into it.")
                 yield from _crawl_url(found_url)
+            else:
+                logger.debug(f"Ignoring link: {href} (not a video or directory)")
 
     logger.debug("Exiting _crawl_url()")
 

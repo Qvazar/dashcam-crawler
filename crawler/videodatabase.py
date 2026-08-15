@@ -1,14 +1,14 @@
 from collections.abc import Iterable
 from datetime import datetime
-import logging
 import sqlite3
 
 from . import debug
+from .logging import getLogger
 from .videorecord import VideoRecord, VideoStatus
 
 DB_FILENAME = "./videos.db"
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 sqlite3.register_adapter(datetime, lambda val: val.replace(tzinfo=None).isoformat(timespec='seconds'))
 sqlite3.register_converter("DATETIME", lambda val: datetime.fromisoformat(val.decode("utf-8")) if val else None)

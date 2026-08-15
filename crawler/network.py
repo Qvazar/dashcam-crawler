@@ -1,7 +1,7 @@
-import logging
 import subprocess
+from .logging import getLogger
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 def get_current_ssid():
     """Retrieves the SSID of the WiFi network the Pi is currently connected to."""
