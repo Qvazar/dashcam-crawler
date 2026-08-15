@@ -11,8 +11,8 @@ from ..videorecord import VideoRecord, VideoStatus
 
 logger = getLogger(__name__)
 
-FITCAMX_MARKED_VIDEO_DIRS = os.environ.get("FITCAMX_MARKED_VIDEO_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(",")  # Directories for marked videos (if applicable)
-VIDEO_EXTENSIONS = os.environ.get("VIDEO_EXTENSIONS", ".TS").split(",")  # Comma-separated list of video file extensions to consider
+FITCAMX_MARKED_VIDEO_DIRS = tuple(os.environ.get("FITCAMX_MARKED_VIDEO_DIRS", "CARDV/EMR/,CARDV/EMR_E/").split(","))  # Directories for marked videos (if applicable)
+VIDEO_EXTENSIONS = tuple(os.environ.get("VIDEO_EXTENSIONS", ".TS").split(","))  # Comma-separated list of video file extensions to consider
 
 logger.debug(f"FITCAMX_MARKED_VIDEO_DIRS: {FITCAMX_MARKED_VIDEO_DIRS}")
 logger.debug(f"VIDEO_EXTENSIONS: {VIDEO_EXTENSIONS}")
@@ -73,11 +73,11 @@ def _crawl_url(url: str):
 
             found_url = urljoin(url, href)
 
-            if any(href.strip().endswith(ext) for ext in VIDEO_EXTENSIONS):
+            if href.strip().endswith(VIDEO_EXTENSIONS):
                 video_path = urlsplit(found_url).path
                 filename = os.path.basename(video_path)
                 video_recorded_at: datetime = _datetime_from_filename(filename)
-                marked = any(dir in video_path for dir in FITCAMX_MARKED_VIDEO_DIRS)
+                marked = video_path.lstrip("/").startswith(FITCAMX_MARKED_VIDEO_DIRS)
 
                 logger.debug(f"Found video: {video_path}")
 
