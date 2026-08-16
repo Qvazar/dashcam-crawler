@@ -1,10 +1,19 @@
 from collections.abc import Iterable
 import os
+import shutil
 
 from . import debug
 
 
 TEMP_FILENAME = ".~downloading_video.TS"
+FREE_SPACE_MINIMUM_BYTES = 500 * 1024 * 1024  # Minimum free space required in bytes (500 MB)
+
+def check_free_space(path:str, minimum_bytes:int = FREE_SPACE_MINIMUM_BYTES):
+    """Check if there is enough free space in the given path."""
+    total, used, free = shutil.disk_usage(path)
+    if free < minimum_bytes:
+        raise OSError(f"Insufficient disk space. Available: {free} bytes, Required: {minimum_bytes} bytes.")
+
 
 class _VideoFileStorage:
     def __init__(self, dirname: str = "./videos"):
@@ -14,8 +23,11 @@ class _VideoFileStorage:
     def store_video(self, video_name:str, data:Iterable[bytes]):
         os.makedirs(self.dirname, exist_ok=True)
 
+        check_free_space(self.dirname)  # Ensure there is enough free space before storing the video
+
         final_path = os.path.join(self.dirname, video_name)
         temp_path = os.path.join(self.dirname, TEMP_FILENAME)
+
         with open(temp_path, 'wb') as f:
             for chunk in data:
                 if chunk:

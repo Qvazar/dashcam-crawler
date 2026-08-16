@@ -53,15 +53,36 @@ class Config:
         self.target,
         self.heartbeat_interval)
 
+@debug.timed
+def delete_videos_from_source(videodb: VideoDatabase, source):
+    """Delete videos from the source that have been successfully uploaded."""
+    deleted_count = 0
+    try:
+        for video in videodb.find_uploaded_videos():
+            try:
+                source.delete_video(video)
+                video.status = VideoStatus.UPLOADED_AND_DELETED
+                videodb.update_videos([video])
+                deleted_count += 1
+            except Exception as e:
+                logger.error("Error deleting video %s from source: %s", video.filename, e)
+    except Exception as e:
+        logger.error("Exception when deleting videos from source: %s", e)
+
+    logger.info("Total videos deleted from source: %d", deleted_count)
+
 
 @debug.timed
 def register_videos_from_source(videodb, source):
+    video_count = 0
     try:
-        videodb.insert_videos(source.find_videos())
+        video_count = videodb.insert_videos(source.find_videos())
     except Exception as e:
         logger.error("Exception when crawling videos: %s", e)
 
+    logger.info("Total new videos registered from source: %d", video_count)
 
+@debug.timed
 def ignore_unmarked_videos(videodb, extended_marked_window=0):
     try:
         ignored_count = videodb.ignore_unmarked_videos(extended_marked_window)
@@ -92,8 +113,8 @@ def download_videos_from_source(videodb, source, video_recording_window=0):
                 videodb.update_videos([video])
     except Exception as e:
         logger.error("Exception when downloading videos: %s", e)
-    finally:
-        logger.info("Total downloaded videos: %d", downloaded_count)
+
+    logger.info("Total downloaded videos: %d", downloaded_count)
 
 
 @debug.timed
@@ -162,6 +183,7 @@ def main():
                     logger.debug("No WiFi connection. Waiting...")
                 elif ssid == config.camera_ssid:
                     with videodb.checkpoint():
+                        delete_videos_from_source(videodb, source)
                         register_videos_from_source(videodb, source)
                         ignore_unmarked_videos(videodb, config.video_extended_marked_window)
                         download_videos_from_source(videodb, source, config.video_recording_window)
@@ -173,7 +195,7 @@ def main():
             except Exception as e:
                 logger.exception("Unexpected error: %s", e)
 
-            # Idle sleep interval to avoid unnecessary CPU/battery consumption
+            # Idle sleep interval to avoid unnecessary CPU/battery consumption and network usage.
             shutdown_event.wait(timeout=config.heartbeat_interval)
 
     logger.info("Crawler stopped gracefully.")

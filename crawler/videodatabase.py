@@ -195,6 +195,22 @@ class VideoDatabase:
             for row in cursor:
                 yield VideoRecord(*row)
 
+    def find_uploaded_videos(self):
+        """Finds videos that have been uploaded and are ready for deletion."""
+        with self._db_conn:
+            cursor = self._db_conn.execute(
+                """
+                SELECT filename, camera_path, status, recorded_at, marked, crc32c, registered_at
+                FROM videos
+                WHERE status = :status_uploaded_and_deleted
+                """,
+                {
+                    'status_uploaded_and_deleted': VideoStatus.UPLOADED_AND_DELETED.value
+                }
+            )
+            for row in cursor:
+                yield VideoRecord(*row)
+
 
 class _CheckpointContextManager:
     """Context manager for database checkpointing."""

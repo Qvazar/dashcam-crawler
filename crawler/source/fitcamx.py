@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from datetime import datetime
 import os
 from typing import Iterator
@@ -47,8 +48,11 @@ def _datetime_from_filename(filename) -> datetime:
 def _get_camera_url() -> str:
     camera_ip = get_network_gateway()
     if camera_ip:
-        return f"http://{camera_ip}"
-    raise RuntimeError("Could not determine camera address from network gateway")
+        camera_url = f"http://{camera_ip}"
+        logger.debug(f"Camera URL determined as: {camera_url}")
+        return camera_url
+    else:
+        raise RuntimeError("Could not determine camera address from network gateway")
 
 
 def _crawl_url(url: str):
@@ -99,7 +103,6 @@ class _FitcamXSource:
     @timed
     def find_videos(self):
         camera_url = _get_camera_url()
-        logger.info(f"Camera URL determined as: {camera_url}")        
         return _crawl_url(camera_url)
 
     @timed
@@ -114,5 +117,19 @@ class _FitcamXSource:
             video_stream.raise_for_status()
             yield from video_stream.iter_content(chunk_size=2*1024*1024)  # Yield the video stream in chunks for the video
 
+    @timed
+    def delete_video(self, video: VideoRecord):
+        """Delete a video from the camera."""
+        camera_url = _get_camera_url()
+        video_url = urljoin(camera_url, video.camera_path)
+        #response = requests.delete(video_url, timeout=10)
+        response = requests.get(f"{video_url}?del=1", timeout=10)  # Using GET for deletion as per FitcamX behavior
+
+        logger.debug("Attempted to delete video %s from camera at %s, received status code: %d, response text: %s", video.filename, video_url, response.status_code, response.text)
+
+        if response.status_code == 404:
+            logger.warning(f"Video {video.filename} not found at {video_url} for deletion.")
+        else:
+            response.raise_for_status()
 
 fitcamx = _FitcamXSource()

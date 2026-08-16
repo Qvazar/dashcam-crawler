@@ -7,6 +7,7 @@ class VideoStatus(Enum):
     DOWNLOADED = "downloaded"
     IGNORED = "ignored"
     UPLOADED = "uploaded"
+    UPLOADED_AND_DELETED = "uploaded & deleted"
 
 
 class VideoRecord:
