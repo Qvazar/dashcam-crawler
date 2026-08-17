@@ -4,11 +4,11 @@ import os
 class CustomLogger(logging.getLoggerClass()):
     def __init__(self, name):
         super().__init__(name)
-        self._setLoggerSpecificLevel()
+        self._setLoggerSpecificLevelFromEnv()
 
-    def _setLoggerSpecificLevel(self):
+    def _setLoggerSpecificLevelFromEnv(self):
         """Set the logger-specific log level from environment variable."""
-        env_var_name = f"LOGLEVEL_{self.name.upper()}"
+        env_var_name = f"LOGLEVEL_{self.name.upper().replace('.', '_')}"
         level = os.environ.get(env_var_name, None)
         if level:
             self.setLevel(level)

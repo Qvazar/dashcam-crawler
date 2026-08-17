@@ -55,7 +55,7 @@ def _get_camera_url() -> str:
         raise RuntimeError("Could not determine camera address from network gateway")
 
 
-def _crawl_url(url: str):
+def _crawl_url(url: str) -> Iterable[VideoRecord]:
     """Crawls a given URL and yields found videos."""
     logger.debug("Entered _crawl_url()")
 
@@ -73,8 +73,6 @@ def _crawl_url(url: str):
     for link in links:
         href = link.get('href')
         if href:
-            logger.debug(f"Parsing link: {href}")
-
             found_url = urljoin(url, href)
 
             if href.strip().endswith(VIDEO_EXTENSIONS):

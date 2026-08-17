@@ -88,30 +88,29 @@ class VideoDatabase:
     @debug.timed
     def insert_videos(self, videos: Iterable[VideoRecord]):
         """Inserts new video records into the database using VideoRecord instances."""
-        logger.debug("Entered insert_videos()")
-
+        inserted_count = 0
         with self._db_conn:
-            cursor = self._db_conn.executemany('''
-                INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked, crc32c)
-                VALUES (:filename, :camera_path, :status, :recorded_at, :marked, :crc32c)
-            ''',
-            map(lambda v: {
-                'filename': v.filename,
-                'camera_path': v.camera_path,
-                'status': v.status.value,
-                'recorded_at': v.recorded_at,
-                'marked': v.marked,
-                'crc32c': v.crc32c
-            }, videos)
-            )
+            for v in videos:
+                cursor = self._db_conn.execute('''
+                    INSERT OR IGNORE INTO videos (filename, camera_path, status, recorded_at, marked, crc32c)
+                    VALUES (:filename, :camera_path, :status, :recorded_at, :marked, :crc32c)
+                ''',
+                {
+                    'filename': v.filename,
+                    'camera_path': v.camera_path,
+                    'status': v.status.value,
+                    'recorded_at': v.recorded_at,
+                    'marked': v.marked,
+                    'crc32c': v.crc32c
+                })
 
-            logger.debug("Exiting insert_videos()")
-            return cursor.rowcount  # Return the number of rows inserted
+                inserted_count += cursor.rowcount  # Increment count if a row was inserted
+
+            return inserted_count  # Return the number of rows inserted
 
     @debug.timed
     def update_videos(self, videos: Iterable[VideoRecord]):
         """Updates the status and crc32c of a video record in the database."""
-        logger.debug("Entered update_videos()")
 
         with self._db_conn:
             for video in videos:
@@ -125,12 +124,10 @@ class VideoDatabase:
                     'filename': video.filename
                 })
 
-        logger.debug("Exiting update_videos()")
 
     @debug.timed
     def ignore_unmarked_videos(self, marked_window: int):
         """Find videos that are not marked and with a recorded_at outside of the marked window of marked videos' recorded_at and ignore them."""
-        logger.debug("Entered ignore_unmarked_videos()")
 
         with self._db_conn:
             cursor = self._db_conn.execute(
@@ -153,15 +150,13 @@ class VideoDatabase:
                     'marked_window_end': f'+{marked_window} minutes'
                 }
             )
-
-            logger.debug("Exiting ignore_unmarked_videos()")
             return cursor.rowcount  # Return the number of rows affected by the update
         
     @debug.timed
     def find_videos_to_download(self, video_recording_window: int = 0):
         """Finds videos that are ready to be downloaded."""
         with self._db_conn:
-            # We can never assume to currect datetime from the camera, so allow all videos to finish recording before downloading.
+            # We can never assume the correct datetime from the camera, so allow all videos to finish recording before downloading.
             # This is done by checking if the registered_at is older than a certain window (video_recording_window) from the current db time.
             cursor = self._db_conn.execute(
                 """

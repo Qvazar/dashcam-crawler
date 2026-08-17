@@ -106,11 +106,13 @@ def download_videos_from_source(videodb, source, video_recording_window=0):
                 videodb.update_videos([video])
                 downloaded_count += 1
 
-                logger.info("Downloaded video: %s", video.filename)
+                logger.debug("Downloaded video: %s", video.filename)
             except FileNotFoundError as e:
                 logger.warning("Video %s not found on source. Marking as 'not found'.", video.filename)
                 video.status = VideoStatus.NOT_FOUND
                 videodb.update_videos([video])
+            except Exception as e:
+                logger.error("Error downloading video %s: %s", video.filename, e)
     except Exception as e:
         logger.error("Exception when downloading videos: %s", e)
 
@@ -181,13 +183,13 @@ def main():
                 
                 if ssid is None:
                     logger.debug("No WiFi connection. Waiting...")
-                elif ssid == config.camera_ssid:
+                elif ssid == config.camera_ssid: # Connected to the camera's WiFi network
                     with videodb.checkpoint():
                         delete_videos_from_source(videodb, source)
                         register_videos_from_source(videodb, source)
                         ignore_unmarked_videos(videodb, config.video_extended_marked_window)
                         download_videos_from_source(videodb, source, config.video_recording_window)
-                else:
+                else: # Connected to a different WiFi network
                     if destination:
                         with videodb.checkpoint():
                             upload_to_destination(videodb, destination)

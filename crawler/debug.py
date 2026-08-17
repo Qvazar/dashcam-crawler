@@ -10,6 +10,7 @@ def timed(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if logger.isDebugEnabled():
+            logger.debug(f"Starting execution of {f.__name__} with args: {args}, kwargs: {kwargs}")
             start_time = time.perf_counter()
             result = f(*args, **kwargs)
             end_time = time.perf_counter()
