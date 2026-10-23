@@ -18,6 +18,10 @@ VIDEO_EXTENSIONS = tuple(os.environ.get("VIDEO_EXTENSIONS", ".TS").split(","))  
 logger.debug(f"FITCAMX_MARKED_VIDEO_DIRS: {FITCAMX_MARKED_VIDEO_DIRS}")
 logger.debug(f"VIDEO_EXTENSIONS: {VIDEO_EXTENSIONS}")
 
+def _log_request_response(url: str, response: requests.Response):
+    """Log the response of a download file request for debugging purposes."""
+    logger.getChild("RESPONSE").debug(f"Response from {url} received with status code {response.status_code} and headers {response.headers}")
+
 
 def _log_crawl_url_response_to_file(url: str, response: requests.Response):
     """Log the response of a crawl URL to a file for debugging purposes."""
@@ -32,6 +36,9 @@ def _log_crawl_url_response_to_file(url: str, response: requests.Response):
             with open(log_file_path, "w", encoding="utf-8") as log_file:
                 log_file.write(f"URL: {url}\n")
                 log_file.write(f"Status Code: {response.status_code}\n")
+                log_file.write("Response Headers:\n")
+                for header, value in response.headers.items():
+                    log_file.write(f"{header}: {value}\n")
                 log_file.write("Response Content:\n")
                 log_file.write(response.text)
             
@@ -109,6 +116,8 @@ class _FitcamXSource:
         camera_url = _get_camera_url()
         video_url = urljoin(camera_url, video.camera_path)
         with requests.get(video_url, stream=True, timeout=60) as video_stream:
+            _log_request_response(video_url, video_stream)
+
             if video_stream.status_code == 404:
                 raise FileNotFoundError(f"Video {video.filename} not found at {video_url}")
             
@@ -122,6 +131,7 @@ class _FitcamXSource:
         video_url = urljoin(camera_url, video.camera_path)
         #response = requests.delete(video_url, timeout=10)
         response = requests.get(f"{video_url}?del=1", timeout=10)  # Using GET for deletion as per FitcamX behavior
+        _log_request_response(f"{video_url}?del=1", response)
 
         logger.debug("Attempted to delete video %s from camera at %s, received status code: %d, response text: %s", video.filename, video_url, response.status_code, response.text)
 
