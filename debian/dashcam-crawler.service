@@ -1,0 +1,21 @@
+[Unit]
+Description=Dashcam Crawler
+After=network.target
+StartLimitBurst=10
+StartLimitIntervalSec=120
+StartLimitAction=reboot
+
+[Service]
+EnvironmentFile=/etc/dashcam-crawler.conf
+Type=exec
+User=dashcam-crawler
+WorkingDirectory=/var/lib/dashcam-crawler
+Environment="PYTHONDONTWRITEBYTECODE=1"
+ExecStart=/usr/bin/dashcam-crawler
+Restart=always
+RestartSec=15
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,51 @@
+#!/usr/bin/make -f
+
+PACKAGE        := dashcam-crawler
+DESTDIR        := $(CURDIR)/debian/$(PACKAGE)
+INSTALL_PREFIX := /usr/lib/dashcam-crawler
+SYSTEMD_DIR    := /usr/lib/systemd/system
+
+# Allow pip to install outside a virtual environment inside the build sandbox.
+export PIP_BREAK_SYSTEM_PACKAGES = 1
+export PIP_NO_CACHE_DIR = 1
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	: # pip install handles everything in dh_auto_install
+
+override_dh_auto_install:
+	# Install the Python package and all its declared dependencies into the
+	# prefix under DESTDIR.  The resulting site-packages directory is added
+	# to PYTHONPATH by the systemd unit so no virtual environment is needed.
+	python3 -m pip install . \
+		--prefix=$(INSTALL_PREFIX) \
+		--root=$(DESTDIR) \
+		--no-compile \
+		--quiet
+
+	# Install a wrapper in /usr/bin that dynamically discovers the correct
+	# site-packages path at runtime — avoids hardcoding the Python minor version.
+	install -d $(DESTDIR)/usr/bin
+	install -m 755 debian/dashcam-crawler.wrapper $(DESTDIR)/usr/bin/dashcam-crawler
+
+	# Install the example configuration file (treated as a conffile by
+	# dh_installdeb because it lands under /etc).
+	install -d $(DESTDIR)/etc
+	install -m 644 dashcam-crawler.conf $(DESTDIR)/etc/dashcam-crawler.conf
+
+	# Install the pre-rendered systemd units.
+	install -d $(DESTDIR)$(SYSTEMD_DIR)
+	install -m 644 debian/dashcam-crawler.service \
+		$(DESTDIR)$(SYSTEMD_DIR)/dashcam-crawler.service
+	install -m 644 debian/dashcam-crawler-restart.service \
+		$(DESTDIR)$(SYSTEMD_DIR)/dashcam-crawler-restart.service
+	install -m 644 debian/dashcam-crawler-restart.path \
+		$(DESTDIR)$(SYSTEMD_DIR)/dashcam-crawler-restart.path
+
+override_dh_auto_test:
+	: # Tests are run separately in CI before the package is built
+
+override_dh_installsystemd:
+	: # Service lifecycle is managed explicitly in postinst/prerm/postrm

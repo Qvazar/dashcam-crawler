@@ -1,0 +1,7 @@
+[Unit]
+Description=Restart Dashcam Crawler after config changes
+After=dashcam-crawler.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl restart dashcam-crawler.service
