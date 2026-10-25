@@ -2,7 +2,7 @@
 # Dashcam Crawler — Container Installation Script
 #
 # Usage:
-#   sudo bash install.sh
+#   sudo bash install.sh [--tag <tag>]
 #
 # Or download and run in one step:
 #   curl -fsSL https://raw.githubusercontent.com/Qvazar/dashcam-crawler/main/install.sh | sudo bash
@@ -11,9 +11,41 @@
 
 set -euo pipefail
 
-# Allow overriding the image for testing or pinned deployments:
-#   sudo DASHCAM_IMAGE=ghcr.io/qvazar/dashcam-crawler:v1.2.3 bash install.sh
-IMAGE="${DASHCAM_IMAGE:-ghcr.io/qvazar/dashcam-crawler:latest}"
+DEFAULT_TAG="v1"
+IMAGE_REPO="ghcr.io/qvazar/dashcam-crawler"
+IMAGE_TAG="$DEFAULT_TAG"
+
+usage() {
+    cat <<EOF
+Usage: sudo bash install.sh [--tag <tag>] [--help]
+
+Options:
+  --tag <tag>  Container tag to install (example: v1.2.3)
+  --help       Show this help message
+
+Defaults:
+  Uses latest major release tag: $DEFAULT_TAG
+EOF
+}
+
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --tag)
+                [[ $# -ge 2 ]] || die "--tag requires a value"
+                IMAGE_TAG="$2"
+                shift 2
+                ;;
+            --help|-h)
+                usage
+                exit 0
+                ;;
+            *)
+                die "Unknown argument: $1. Run with --help for usage."
+                ;;
+        esac
+    done
+}
 
 SERVICE_NAME="dashcam-crawler"
 CONFIG_FILE="/etc/dashcam-crawler.conf"
@@ -235,6 +267,8 @@ start_service() {
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 main() {
+    parse_args "$@"
+    IMAGE="${DASHCAM_IMAGE:-$IMAGE_REPO:$IMAGE_TAG}"
     check_root
     install_podman
     setup_volume
@@ -261,4 +295,4 @@ main() {
     echo ""
 }
 
-main
+main "$@"
