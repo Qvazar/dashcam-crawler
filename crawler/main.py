@@ -54,11 +54,13 @@ class Config:
         self.heartbeat_interval)
 
 @debug.timed
-def delete_videos_from_source(videodb: VideoDatabase, source):
+def delete_videos_from_source(videodb: VideoDatabase, is_source_connected, source):
     """Delete videos from the source that have been successfully uploaded."""
     deleted_count = 0
     try:
         for video in videodb.find_uploaded_videos():
+            if not is_source_connected():
+                raise IOError("Disconnected from source.")
             try:
                 source.delete_video(video)
                 video.status = VideoStatus.UPLOADED_AND_DELETED
@@ -73,9 +75,12 @@ def delete_videos_from_source(videodb: VideoDatabase, source):
 
 
 @debug.timed
-def register_videos_from_source(videodb, source):
+def register_videos_from_source(videodb, is_source_connected, source):
     video_count = 0
     try:
+        if not is_source_connected():
+            raise IOError("Disconnected from source.")
+        
         video_count = videodb.insert_videos(source.find_videos())
     except Exception as e:
         logger.error("Exception when crawling videos: %s", e)
@@ -92,10 +97,14 @@ def ignore_unmarked_videos(videodb, extended_marked_window=0):
 
 
 @debug.timed
-def download_videos_from_source(videodb, source, video_recording_window=0):
+def download_videos_from_source(videodb, is_source_connected, source, video_recording_window=0):
     downloaded_count = 0
     try:
         for video in videodb.find_videos_to_download(video_recording_window):
+            ## Double check that we are still connected to the source before attempting download
+            if not is_source_connected():
+                raise IOError("Disconnected from source.")
+
             try:
                 stream: Crc32cPipe = Crc32cPipe(source.download_video(video))
                 videolocalstorage.store_video(video.filename, stream)
@@ -175,6 +184,10 @@ def main():
     source = fitcamx
     destination = get_destination_from_url(config.target) if config.target else None
 
+    def is_source_connected() -> bool:
+        current_ssid = get_current_ssid()
+        return current_ssid == config.camera_ssid
+
     ssid = None
 
     with VideoDatabase() as videodb:
@@ -187,16 +200,14 @@ def main():
                 
                 if ssid is None:
                     logger.debug("No WiFi connection. Waiting...")
-                elif ssid == config.camera_ssid: # Connected to the camera's WiFi network
-                    with videodb.checkpoint():
-                        delete_videos_from_source(videodb, source)
-                        register_videos_from_source(videodb, source)
-                        ignore_unmarked_videos(videodb, config.video_extended_marked_window)
-                        download_videos_from_source(videodb, source, config.video_recording_window)
+                elif is_source_connected(): # Connected to the camera's WiFi network
+                    delete_videos_from_source(videodb, is_source_connected, source)
+                    register_videos_from_source(videodb, is_source_connected, source)
+                    ignore_unmarked_videos(videodb, config.video_extended_marked_window)
+                    download_videos_from_source(videodb, is_source_connected, source, config.video_recording_window)
                 else: # Connected to a different WiFi network
                     if destination:
-                        with videodb.checkpoint():
-                            upload_to_destination(videodb, destination)
+                        upload_to_destination(videodb, destination)
                         
             except Exception as e:
                 logger.exception("Unexpected error: %s", e)
